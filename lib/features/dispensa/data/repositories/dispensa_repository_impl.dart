@@ -74,4 +74,21 @@ class DispensaRepositoryImpl implements DispensaRepository {
   }) async {
     await _itensRef(casaId).doc(itemId).delete();
   }
+
+  @override
+  Future<void> atualizarDispensaEmLote({
+    required String casaId,
+    required List<String> itemIds,
+    required String userId,
+  }) async {
+    final batch = _firestore.batch();
+    for (final id in itemIds) {
+      batch.update(_itensRef(casaId).doc(id), {
+        'status': ItemStatus.tem.firestoreValue,
+        'atualizadoEm': FieldValue.serverTimestamp(),
+        'atualizadoPor': userId,
+      });
+    }
+    await batch.commit();
+  }
 }

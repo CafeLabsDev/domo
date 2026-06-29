@@ -28,4 +28,10 @@ abstract class DispensaRepository {
     required String casaId,
     required String itemId,
   });
+
+  Future<void> atualizarDispensaEmLote({
+    required String casaId,
+    required List<String> itemIds,
+    required String userId,
+  });
 }

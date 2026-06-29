@@ -79,4 +79,21 @@ class DispensaController extends _$DispensaController {
           ),
     );
   }
+
+  Future<void> atualizarDispensaEmLote({
+    required String casaId,
+    required List<String> itemIds,
+  }) async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null || itemIds.isEmpty) return;
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(dispensaRepositoryProvider).atualizarDispensaEmLote(
+            casaId: casaId,
+            itemIds: itemIds,
+            userId: user.uid,
+          ),
+    );
+  }
 }
