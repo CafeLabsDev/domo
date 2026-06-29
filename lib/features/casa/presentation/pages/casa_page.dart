@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/membro_model.dart';
@@ -11,6 +12,70 @@ import '../providers/casa_provider.dart';
 
 class CasaPage extends ConsumerWidget {
   const CasaPage({super.key});
+
+  void _copiarCodigo(BuildContext context, String codigo) {
+    Clipboard.setData(ClipboardData(text: codigo));
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Código copiado!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  void _confirmarSaida(BuildContext context, WidgetRef ref, String casaId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sair da casa'),
+        content: const Text(
+          'Você vai perder o acesso a esta casa. Para voltar, precisará do código de convite.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(casaControllerProvider.notifier).sairDaCasa(casaId);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarExclusao(BuildContext context, WidgetRef ref, String casaId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deletar casa'),
+        content: const Text(
+          'Todos os membros perderão o acesso. Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(casaControllerProvider.notifier).deletarCasa(casaId);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Deletar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,17 +108,40 @@ class CasaPage extends ConsumerWidget {
               IconButton(
                 tooltip: 'Copiar código',
                 icon: const Icon(Icons.share_rounded),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: casa.codigo));
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      const SnackBar(
-                        content: Text('Código copiado!'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                onPressed: () => _copiarCodigo(context, casa.codigo),
+              ),
+              PopupMenuButton<_MenuAcao>(
+                onSelected: (acao) {
+                  if (acao == _MenuAcao.sair) {
+                    _confirmarSaida(context, ref, casa.id);
+                  } else {
+                    _confirmarExclusao(context, ref, casa.id);
+                  }
                 },
+                itemBuilder: (_) => [
+                  if (!isAdmin)
+                    const PopupMenuItem(
+                      value: _MenuAcao.sair,
+                      child: ListTile(
+                        leading: Icon(Icons.logout),
+                        title: Text('Sair da casa'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  if (isAdmin)
+                    PopupMenuItem(
+                      value: _MenuAcao.deletar,
+                      child: ListTile(
+                        leading: Icon(Icons.delete_forever,
+                            color: AppColors.error),
+                        title: Text(
+                          'Deletar casa',
+                          style: TextStyle(color: AppColors.error),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -137,6 +225,7 @@ class CasaPage extends ConsumerWidget {
                             (m) => _MembroTile(
                               membro: m,
                               casaId: casa.id,
+                              currentUserId: currentUserId,
                               isPending: true,
                               isAdmin: isAdmin,
                             ),
@@ -148,6 +237,7 @@ class CasaPage extends ConsumerWidget {
                           (m) => _MembroTile(
                             membro: m,
                             casaId: casa.id,
+                            currentUserId: currentUserId,
                             isPending: false,
                             isAdmin: isAdmin,
                           ),
@@ -164,6 +254,8 @@ class CasaPage extends ConsumerWidget {
     );
   }
 }
+
+enum _MenuAcao { sair, deletar }
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader(this.title);
@@ -187,17 +279,52 @@ class _MembroTile extends ConsumerWidget {
   const _MembroTile({
     required this.membro,
     required this.casaId,
+    required this.currentUserId,
     required this.isPending,
     required this.isAdmin,
   });
 
   final MembroModel membro;
   final String casaId;
+  final String currentUserId;
   final bool isPending;
   final bool isAdmin;
 
+  void _confirmarRemocao(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remover membro'),
+        content: Text(
+          'Deseja remover ${membro.nome} da casa? '
+          'Eles perderão o acesso imediatamente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref
+                  .read(casaControllerProvider.notifier)
+                  .removerMembro(casaId, membro.userId);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Remover'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final podeRemover = isAdmin &&
+        !isPending &&
+        membro.userId != currentUserId;
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: ListTile(
@@ -233,7 +360,14 @@ class _MembroTile extends ConsumerWidget {
                   ),
                 ],
               )
-            : null,
+            : podeRemover
+                ? IconButton(
+                    tooltip: 'Remover membro',
+                    icon: const Icon(Icons.person_remove_outlined),
+                    color: Theme.of(context).colorScheme.error,
+                    onPressed: () => _confirmarRemocao(context, ref),
+                  )
+                : null,
       ),
     );
   }

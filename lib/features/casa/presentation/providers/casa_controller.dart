@@ -72,4 +72,34 @@ class CasaController extends _$CasaController {
           ),
     );
   }
+
+  Future<void> removerMembro(String casaId, String userId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(casaRepositoryProvider).removerMembroAtivo(
+            casaId: casaId,
+            userId: userId,
+          ),
+    );
+  }
+
+  Future<void> sairDaCasa(String casaId) async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(casaRepositoryProvider).removerMembroAtivo(
+            casaId: casaId,
+            userId: user.uid,
+          ),
+    );
+  }
+
+  Future<void> deletarCasa(String casaId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(casaRepositoryProvider).deletarCasa(casaId: casaId),
+    );
+  }
 }

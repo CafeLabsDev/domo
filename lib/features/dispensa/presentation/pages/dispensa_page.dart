@@ -64,7 +64,10 @@ class _DispensaContent extends ConsumerWidget {
       body: itensAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Erro ao carregar itens: $e')),
-        data: (itens) {
+        data: (todos) {
+          final itens = todos
+              .where((i) => i.status != ItemStatus.noCarrinho)
+              .toList();
           if (itens.isEmpty) {
             return _EmptyState(onAdd: () => _openSheet(context));
           }

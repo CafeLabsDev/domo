@@ -19,9 +19,7 @@ class MercadoPage extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('Erro: $e')),
-      ),
+      error: (e, _) => Scaffold(body: Center(child: Text('Erro: $e'))),
       data: (casa) {
         if (casa == null) return const Scaffold(body: SizedBox.shrink());
         return _MercadoContent(casaId: casa.id);
@@ -50,22 +48,32 @@ class _MercadoContent extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Erro: $e')),
         data: (todos) {
           final itens = todos
-              .where((i) => i.status == ItemStatus.noCarrinho)
+              .where((i) =>
+                  i.status == ItemStatus.naoTem ||
+                  i.status == ItemStatus.noCarrinho)
               .toList();
 
           if (itens.isEmpty) return const _EmptyState();
 
+          final noCarrinho =
+              itens.where((i) => i.status == ItemStatus.noCarrinho).toList();
+
           return _ListaDeCompras(
             itens: itens,
-            onMarcarItem: (item) => controller.atualizarStatus(
+            onToggleItem: (item) => controller.atualizarStatus(
               casaId: item.casaId,
               itemId: item.id,
-              novoStatus: ItemStatus.tem,
+              novoStatus: item.status == ItemStatus.noCarrinho
+                  ? ItemStatus.naoTem
+                  : ItemStatus.noCarrinho,
             ),
-            onMarcarTudo: () => controller.atualizarDispensaEmLote(
-              casaId: casaId,
-              itemIds: itens.map((i) => i.id).toList(),
-            ),
+            onAtualizarDispensa: noCarrinho.isEmpty
+                ? null
+                : () => controller.atualizarDispensaEmLote(
+                      casaId: casaId,
+                      itemIds: noCarrinho.map((i) => i.id).toList(),
+                    ),
+            quantidadeNoCarrinho: noCarrinho.length,
           );
         },
       ),
@@ -76,13 +84,15 @@ class _MercadoContent extends ConsumerWidget {
 class _ListaDeCompras extends StatelessWidget {
   const _ListaDeCompras({
     required this.itens,
-    required this.onMarcarItem,
-    required this.onMarcarTudo,
+    required this.onToggleItem,
+    required this.onAtualizarDispensa,
+    required this.quantidadeNoCarrinho,
   });
 
   final List<PantryItem> itens;
-  final void Function(PantryItem) onMarcarItem;
-  final VoidCallback onMarcarTudo;
+  final void Function(PantryItem) onToggleItem;
+  final VoidCallback? onAtualizarDispensa;
+  final int quantidadeNoCarrinho;
 
   Map<String, List<PantryItem>> _group(List<PantryItem> items) {
     final map = <String, List<PantryItem>>{};
@@ -130,7 +140,7 @@ class _ListaDeCompras extends StatelessWidget {
                   ...items.map(
                     (item) => _MercadoItemTile(
                       item: item,
-                      onTap: () => onMarcarItem(item),
+                      onToggle: () => onToggleItem(item),
                     ),
                   ),
                 ],
@@ -138,9 +148,9 @@ class _ListaDeCompras extends StatelessWidget {
             },
           ),
         ),
-        _BotaoMarcarTudo(
-          quantidade: itens.length,
-          onPressed: onMarcarTudo,
+        _RodapeBotao(
+          quantidade: quantidadeNoCarrinho,
+          onPressed: onAtualizarDispensa,
         ),
       ],
     );
@@ -148,39 +158,61 @@ class _ListaDeCompras extends StatelessWidget {
 }
 
 class _MercadoItemTile extends StatelessWidget {
-  const _MercadoItemTile({required this.item, required this.onTap});
+  const _MercadoItemTile({required this.item, required this.onToggle});
 
   final PantryItem item;
-  final VoidCallback onTap;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final noCarrinho = item.status == ItemStatus.noCarrinho;
 
     return InkWell(
-      onTap: onTap,
+      onTap: onToggle,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               width: 24,
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: noCarrinho ? AppColors.statusInCart : Colors.transparent,
                 border: Border.all(
-                  color: AppColors.statusInCart,
+                  color: noCarrinho
+                      ? AppColors.statusInCart
+                      : theme.colorScheme.outline,
                   width: 2,
                 ),
               ),
+              child: noCarrinho
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 item.nome,
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: noCarrinho
+                      ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
+                      : null,
+                  decoration:
+                      noCarrinho ? TextDecoration.lineThrough : null,
+                ),
               ),
             ),
+            if (noCarrinho)
+              Text(
+                'No carrinho',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.statusInCart,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
           ],
         ),
       ),
@@ -188,17 +220,18 @@ class _MercadoItemTile extends StatelessWidget {
   }
 }
 
-class _BotaoMarcarTudo extends StatelessWidget {
-  const _BotaoMarcarTudo({
+class _RodapeBotao extends StatelessWidget {
+  const _RodapeBotao({
     required this.quantidade,
     required this.onPressed,
   });
 
   final int quantidade;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final habilitado = onPressed != null;
     return Container(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -218,11 +251,21 @@ class _BotaoMarcarTudo extends StatelessWidget {
       ),
       child: FilledButton.icon(
         onPressed: onPressed,
+        style: habilitado
+            ? null
+            : FilledButton.styleFrom(
+                backgroundColor:
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
+                foregroundColor:
+                    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
         icon: const Icon(Icons.check_circle_outline),
         label: Text(
-          quantidade == 1
-              ? 'Comprei o item — atualizar dispensa'
-              : 'Comprei tudo ($quantidade itens) — atualizar dispensa',
+          habilitado
+              ? (quantidade == 1
+                  ? 'Atualizar dispensa (1 item)'
+                  : 'Atualizar dispensa ($quantidade itens)')
+              : 'Selecione itens para comprar',
         ),
       ),
     );
@@ -248,13 +291,13 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Carrinho vazio',
+              'Nada para comprar',
               style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Na Dispensa, toque no chip de um item e mude para "No carrinho" para ele aparecer aqui.',
+              'Quando um item da dispensa estiver "Em falta", ele aparecerá aqui para você marcar na lista.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),

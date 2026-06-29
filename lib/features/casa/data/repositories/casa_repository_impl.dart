@@ -144,4 +144,20 @@ class CasaRepositoryImpl implements CasaRepository {
       'membros.$userId.cargo': cargo,
     });
   }
+
+  @override
+  Future<void> removerMembroAtivo({
+    required String casaId,
+    required String userId,
+  }) async {
+    await _casas.doc(casaId).update({
+      'membros.$userId': FieldValue.delete(),
+      'membrosAtivos': FieldValue.arrayRemove([userId]),
+    });
+  }
+
+  @override
+  Future<void> deletarCasa({required String casaId}) async {
+    await _casas.doc(casaId).delete();
+  }
 }

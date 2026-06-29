@@ -78,7 +78,9 @@ class PantryItemCard extends ConsumerWidget {
                 onTap: () => controller.atualizarStatus(
                   casaId: item.casaId,
                   itemId: item.id,
-                  novoStatus: item.status.next,
+                  novoStatus: item.status == ItemStatus.tem
+                      ? ItemStatus.naoTem
+                      : ItemStatus.tem,
                 ),
               ),
             ],

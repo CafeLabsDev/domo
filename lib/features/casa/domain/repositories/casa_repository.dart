@@ -35,4 +35,11 @@ abstract class CasaRepository {
     required String userId,
     required String cargo,
   });
+
+  Future<void> removerMembroAtivo({
+    required String casaId,
+    required String userId,
+  });
+
+  Future<void> deletarCasa({required String casaId});
 }
