@@ -42,10 +42,10 @@ class PantryItemCard extends ConsumerWidget {
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
+            TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.error,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
               ),
               child: const Text('Remover'),
             ),

@@ -55,12 +55,12 @@ class _ProfileContent extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               ref.read(authControllerProvider.notifier).signOut();
             },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Sair'),
           ),
         ],
@@ -169,18 +169,13 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const radius = 52.0;
-    const size = radius * 2;
 
     if (photoUrl != null && photoUrl!.isNotEmpty) {
-      return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: photoUrl!,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          placeholder: (_, _) => _Initials(nome: nome, radius: radius),
-          errorWidget: (_, _, _) => _Initials(nome: nome, radius: radius),
-        ),
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: CachedNetworkImageProvider(photoUrl!),
+        onBackgroundImageError: (_, _) {},
+        backgroundColor: AppColors.primary,
       );
     }
 

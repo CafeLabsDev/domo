@@ -39,12 +39,12 @@ class CasaPage extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               ref.read(casaControllerProvider.notifier).sairDaCasa(casaId);
             },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Sair'),
           ),
         ],
@@ -300,14 +300,14 @@ class _MembroTile extends ConsumerWidget {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               ref
                   .read(casaControllerProvider.notifier)
                   .removerMembro(casaId, membro.userId);
             },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Remover'),
           ),
         ],
