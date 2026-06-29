@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,28 +52,23 @@ class CasaPage extends ConsumerWidget {
     );
   }
 
-  void _confirmarExclusao(BuildContext context, WidgetRef ref, String casaId) {
+  void _confirmarExclusao(
+    BuildContext context,
+    WidgetRef ref,
+    String casaId,
+    String nomeCasa,
+  ) {
+    final isGoogleUser = FirebaseAuth.instance.currentUser?.providerData
+            .any((p) => p.providerId == 'google.com') ??
+        false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Deletar casa'),
-        content: const Text(
-          'Todos os membros perderão o acesso. Esta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(casaControllerProvider.notifier).deletarCasa(casaId);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Deletar'),
-          ),
-        ],
+      builder: (_) => _ConfirmarDelecaoDialog(
+        nomeCasa: nomeCasa,
+        isGoogleUser: isGoogleUser,
+        onConfirm: () =>
+            ref.read(casaControllerProvider.notifier).deletarCasa(casaId),
       ),
     );
   }
@@ -115,7 +111,7 @@ class CasaPage extends ConsumerWidget {
                   if (acao == _MenuAcao.sair) {
                     _confirmarSaida(context, ref, casa.id);
                   } else {
-                    _confirmarExclusao(context, ref, casa.id);
+                    _confirmarExclusao(context, ref, casa.id, casa.nome);
                   }
                 },
                 itemBuilder: (_) => [
@@ -369,6 +365,142 @@ class _MembroTile extends ConsumerWidget {
                   )
                 : null,
       ),
+    );
+  }
+}
+
+class _ConfirmarDelecaoDialog extends StatefulWidget {
+  const _ConfirmarDelecaoDialog({
+    required this.nomeCasa,
+    required this.isGoogleUser,
+    required this.onConfirm,
+  });
+
+  final String nomeCasa;
+  final bool isGoogleUser;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_ConfirmarDelecaoDialog> createState() =>
+      _ConfirmarDelecaoDialogState();
+}
+
+class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
+  final _nomeController = TextEditingController();
+  final _senhaController = TextEditingController();
+  bool _isLoading = false;
+  String? _erro;
+
+  bool get _nomeValido => _nomeController.text == widget.nomeCasa;
+  bool get _senhaValida =>
+      widget.isGoogleUser || _senhaController.text.isNotEmpty;
+  bool get _podeConfirmar => _nomeValido && _senhaValida && !_isLoading;
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _senhaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmar() async {
+    if (!_podeConfirmar) return;
+    setState(() {
+      _isLoading = true;
+      _erro = null;
+    });
+
+    if (!widget.isGoogleUser) {
+      try {
+        final user = FirebaseAuth.instance.currentUser!;
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: _senhaController.text,
+        );
+        await user.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException {
+        setState(() {
+          _isLoading = false;
+          _erro = 'Senha incorreta. Verifique e tente novamente.';
+        });
+        return;
+      }
+    }
+
+    widget.onConfirm();
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: const Text('Deletar casa'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Esta ação é permanente e não pode ser desfeita. '
+              'Todos os membros perderão o acesso.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _nomeController,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Nome da casa',
+                hintText: widget.nomeCasa,
+                helperText: 'Digite exatamente: ${widget.nomeCasa}',
+              ),
+            ),
+            if (!widget.isGoogleUser) ...[
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _senhaController,
+                obscureText: true,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _confirmar(),
+                decoration: const InputDecoration(
+                  labelText: 'Sua senha',
+                ),
+              ),
+            ],
+            if (_erro != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                _erro!,
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _podeConfirmar ? _confirmar : null,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Deletar'),
+        ),
+      ],
     );
   }
 }

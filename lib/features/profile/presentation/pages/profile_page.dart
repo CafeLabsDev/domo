@@ -9,7 +9,6 @@ import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../casa/domain/models/casa_model.dart';
 import '../../../casa/domain/models/membro_model.dart';
-import '../../../casa/presentation/providers/casa_controller.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -43,55 +42,6 @@ class _ProfileContent extends ConsumerWidget {
           (m) => m?.userId == user.uid,
           orElse: () => null,
         );
-  }
-
-  void _editarCargo(
-    BuildContext context,
-    WidgetRef ref,
-    String casaId,
-    String cargoAtual,
-  ) {
-    final controller = TextEditingController(text: cargoAtual);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar cargo'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Cargo'),
-          onSubmitted: (_) => _salvarCargo(ctx, ref, casaId, controller.text),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                _salvarCargo(ctx, ref, casaId, controller.text),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    ).then((_) => controller.dispose());
-  }
-
-  void _salvarCargo(
-    BuildContext ctx,
-    WidgetRef ref,
-    String casaId,
-    String cargo,
-  ) {
-    final texto = cargo.trim();
-    if (texto.isEmpty) return;
-    ref.read(casaControllerProvider.notifier).atualizarCargo(
-          casaId,
-          user.uid,
-          texto,
-        );
-    Navigator.pop(ctx);
   }
 
   void _confirmarSaida(BuildContext context, WidgetRef ref) {
@@ -133,7 +83,6 @@ class _ProfileContent extends ConsumerWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // — Header com avatar e nome —
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(
@@ -167,7 +116,6 @@ class _ProfileContent extends ConsumerWidget {
               ),
             ),
 
-            // — Seção: Na casa —
             if (casa != null) ...[
               _SectionLabel('Na casa', theme),
               _CardSection(
@@ -178,28 +126,18 @@ class _ProfileContent extends ConsumerWidget {
                     value: casa!.nome,
                   ),
                   const Divider(height: 1, indent: 56),
-                  ListTile(
-                    leading: const Icon(Icons.badge_outlined),
-                    title: const Text('Cargo'),
-                    subtitle: Text(
-                      meuMembro?.cargo.isNotEmpty == true
-                          ? meuMembro!.cargo
-                          : '—',
-                    ),
-                    trailing: const Icon(Icons.edit_outlined, size: 18),
-                    onTap: () => _editarCargo(
-                      context,
-                      ref,
-                      casa!.id,
-                      meuMembro?.cargo ?? '',
-                    ),
+                  _InfoTile(
+                    icon: Icons.badge_outlined,
+                    label: 'Cargo',
+                    value: meuMembro?.cargo.isNotEmpty == true
+                        ? meuMembro!.cargo
+                        : '—',
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
             ],
 
-            // — Seção: Conta —
             _SectionLabel('Conta', theme),
             _CardSection(
               children: [
@@ -222,8 +160,6 @@ class _ProfileContent extends ConsumerWidget {
   }
 }
 
-// — Widgets privados auxiliares —
-
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.photoUrl, required this.nome});
 
@@ -233,16 +169,18 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const radius = 52.0;
+    const size = radius * 2;
 
     if (photoUrl != null && photoUrl!.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: photoUrl!,
-        imageBuilder: (_, provider) => CircleAvatar(
-          radius: radius,
-          backgroundImage: provider,
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: photoUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (_, _) => _Initials(nome: nome, radius: radius),
+          errorWidget: (_, _, _) => _Initials(nome: nome, radius: radius),
         ),
-        placeholder: (_, _) => _Initials(nome: nome, radius: radius),
-        errorWidget: (_, _, _) => _Initials(nome: nome, radius: radius),
       );
     }
 
