@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "336092925108",
+    "project_id": "domo-8b336",
+    "storage_bucket": "domo-8b336.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336092925108:android:88865192830e1329ff1be1",
+        "android_client_info": {
+          "package_name": "com.domo.app.domo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "336092925108-c2cnrebdj7kfusm8capjq0mavg9f1qki.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDt8OOeDb6stRi6ne5tOCqTgUjn_YIK_0g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "336092925108-c2cnrebdj7kfusm8capjq0mavg9f1qki.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
