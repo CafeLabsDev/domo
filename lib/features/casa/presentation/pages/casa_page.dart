@@ -44,7 +44,9 @@ class CasaPage extends ConsumerWidget {
               Navigator.pop(ctx);
               ref.read(casaControllerProvider.notifier).sairDaCasa(casaId);
             },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             child: const Text('Sair'),
           ),
         ],
@@ -307,7 +309,9 @@ class _MembroTile extends ConsumerWidget {
                   .read(casaControllerProvider.notifier)
                   .removerMembro(casaId, membro.userId);
             },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             child: const Text('Remover'),
           ),
         ],
@@ -488,7 +492,11 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
         ),
         FilledButton(
           onPressed: _podeConfirmar ? _confirmar : null,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.error,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(88, 44),
+          ),
           child: _isLoading
               ? const SizedBox(
                   width: 16,

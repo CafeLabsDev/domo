@@ -60,7 +60,9 @@ class _ProfileContent extends ConsumerWidget {
               Navigator.pop(ctx);
               ref.read(authControllerProvider.notifier).signOut();
             },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             child: const Text('Sair'),
           ),
         ],

@@ -45,7 +45,7 @@ class PantryItemCard extends ConsumerWidget {
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
+                foregroundColor: Theme.of(ctx).colorScheme.error,
               ),
               child: const Text('Remover'),
             ),

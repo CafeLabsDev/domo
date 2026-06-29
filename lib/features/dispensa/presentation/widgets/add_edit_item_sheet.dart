@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/constants.dart';
 import '../../domain/models/pantry_item.dart';
-import '../providers/dispensa_controller.dart';
+import '../providers/dispensa_provider.dart';
 
 class AddEditItemSheet extends ConsumerStatefulWidget {
   const AddEditItemSheet({
@@ -45,24 +46,32 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
     if (nome.isEmpty) return;
 
     setState(() => _isLoading = true);
-    final controller = ref.read(dispensaControllerProvider.notifier);
 
-    if (_isEditing) {
-      await controller.atualizarItem(
-        casaId: widget.casaId,
-        itemId: widget.item!.id,
-        nome: nome,
-        categoria: _categoria,
-      );
-    } else {
-      await controller.adicionarItem(
-        casaId: widget.casaId,
-        nome: nome,
-        categoria: _categoria,
-      );
+    try {
+      final repo = ref.read(dispensaRepositoryProvider);
+
+      if (_isEditing) {
+        await repo.atualizarItem(
+          casaId: widget.casaId,
+          itemId: widget.item!.id,
+          nome: nome,
+          categoria: _categoria,
+        );
+      } else {
+        final user = ref.read(authStateProvider).valueOrNull;
+        if (user == null) return;
+        await repo.adicionarItem(
+          casaId: widget.casaId,
+          nome: nome,
+          categoria: _categoria,
+          userId: user.uid,
+        );
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
