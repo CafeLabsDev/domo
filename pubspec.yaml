@@ -39,6 +39,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
   # Code generation
   build_runner: ^2.4.15
@@ -52,3 +53,22 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+
+flutter_launcher_icons:
+  image_path: "assets/icons/icon.png"
+
+  # Android
+  android: true
+  min_sdk_android: 21
+  adaptive_icon_foreground: "assets/icons/icon_foreground.png"
+  adaptive_icon_background: "#F8F5EF"
+
+  # iOS (caso queira no futuro)
+  ios: false
+
+  # Web — gera favicon + manifest icons
+  web:
+    generate: true
+    image_path: "assets/icons/icon.png"
+    background_color: "#F8F5EF"
+    theme_color: "#4A7C59"
