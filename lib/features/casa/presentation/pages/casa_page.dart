@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/membro_model.dart';
 import '../providers/casa_controller.dart';
 import '../providers/casa_provider.dart';
+import '../../../../shared/widgets/domo_leading_logo.dart';
 
 class CasaPage extends ConsumerWidget {
   const CasaPage({super.key});
@@ -100,6 +101,8 @@ class CasaPage extends ConsumerWidget {
 
         return Scaffold(
           appBar: AppBar(
+            leading: const DomoLeadingLogo(),
+            leadingWidth: 72,
             title: Text(casa.nome),
             centerTitle: false,
             actions: [

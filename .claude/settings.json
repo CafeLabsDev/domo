@@ -4,7 +4,8 @@
       "Bash(timeout 10 git -C /home/felip/flutter log --oneline -1)",
       "Bash(timeout 10 git -C /home/felip/flutter fetch --dry-run)",
       "Bash(git -C /home/felip/flutter config --list)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(git -C /home/felip/projetos/domo log --oneline -8)"
     ]
   }
 }

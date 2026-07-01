@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../casa/domain/models/casa_model.dart';
 import '../../../casa/domain/models/membro_model.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
+import '../../../../shared/widgets/domo_leading_logo.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -81,7 +82,12 @@ class _ProfileContent extends ConsumerWidget {
     final meuMembro = _meuMembro(membros);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil'), centerTitle: false),
+      appBar: AppBar(
+        leading: const DomoLeadingLogo(),
+        leadingWidth: 72,
+        title: const Text('Perfil'),
+        centerTitle: false,
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [

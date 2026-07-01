@@ -90,10 +90,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Logo / ícone
-                    Icon(
-                      Icons.home_rounded,
-                      size: 64,
-                      color: theme.colorScheme.primary,
+                    SvgPicture.asset(
+                      'assets/icons/domo_icon.svg',
+                      height: 60,
                     ),
                     const SizedBox(height: AppSpacing.lg),
 
