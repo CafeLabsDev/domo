@@ -8,7 +8,7 @@ import '../providers/dispensa_controller.dart';
 import '../providers/dispensa_provider.dart';
 import '../widgets/add_edit_item_sheet.dart';
 import '../widgets/pantry_item_card.dart';
-import '../../../../shared/widgets/domo_leading_logo.dart';
+import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class DispensaPage extends ConsumerWidget {
   const DispensaPage({super.key});
@@ -55,9 +55,7 @@ class _DispensaContent extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const DomoLeadingLogo(),
-        leadingWidth: 72,
-        title: const Text('Dispensa'),
+        title: DomoPageTitle('Dispensa'),
         centerTitle: false,
       ),
       floatingActionButton: FloatingActionButton(

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
@@ -10,7 +11,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../casa/domain/models/casa_model.dart';
 import '../../../casa/domain/models/membro_model.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
-import '../../../../shared/widgets/domo_leading_logo.dart';
+import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -83,9 +84,7 @@ class _ProfileContent extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const DomoLeadingLogo(),
-        leadingWidth: 72,
-        title: const Text('Perfil'),
+        title: DomoPageTitle('Perfil'),
         centerTitle: false,
       ),
       body: SingleChildScrollView(
@@ -145,6 +144,42 @@ class _ProfileContent extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.md),
             ],
+
+            _SectionLabel('Aparência', theme),
+            _CardSection(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md,
+                  ),
+                  child: SegmentedButton<ThemeMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.brightness_auto_outlined),
+                        label: Text('Sistema'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Claro'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Escuro'),
+                      ),
+                    ],
+                    selected: {ref.watch(themeModeProvider)},
+                    onSelectionChanged: (set) {
+                      ref.read(themeModeProvider.notifier).state = set.first;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
 
             _SectionLabel('Conta', theme),
             _CardSection(

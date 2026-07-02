@@ -7,7 +7,7 @@ import '../../../casa/presentation/providers/casa_provider.dart';
 import '../../../dispensa/domain/models/pantry_item.dart';
 import '../../../dispensa/presentation/providers/dispensa_controller.dart';
 import '../../../dispensa/presentation/providers/dispensa_provider.dart';
-import '../../../../shared/widgets/domo_leading_logo.dart';
+import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class MercadoPage extends ConsumerWidget {
   const MercadoPage({super.key});
@@ -41,9 +41,7 @@ class _MercadoContent extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const DomoLeadingLogo(),
-        leadingWidth: 72,
-        title: const Text('Lista de Compras'),
+        title: DomoPageTitle('Lista de Compras'),
         centerTitle: false,
       ),
       body: itensAsync.when(
