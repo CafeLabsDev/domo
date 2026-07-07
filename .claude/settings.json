@@ -12,7 +12,12 @@
       "Bash(git remote *)",
       "Bash(SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519)",
       "Bash(SSH_ASKPASS_REQUIRE=never ssh -T git@github.com)",
-      "Bash(ssh -T git@github.com)"
+      "Bash(ssh -T git@github.com)",
+      "Bash(firebase --version)",
+      "Bash(firebase login:list)",
+      "Bash(firebase projects:list)",
+      "Bash(flutter build *)",
+      "Bash(firebase deploy *)"
     ]
   }
 }
