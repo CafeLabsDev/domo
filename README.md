@@ -1,5 +1,7 @@
 # Domo
 
+Um produto [Café Labs](https://cafelabs.net).
+
 App de gestão doméstica para famílias e grupos — Android e Web.
 
 ## Funcionalidades

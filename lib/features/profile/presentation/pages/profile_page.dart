@@ -196,6 +196,13 @@ class _ProfileContent extends ConsumerWidget {
             ),
 
             const SizedBox(height: AppSpacing.xl),
+            Text(
+              'Domo — um produto Café Labs',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
           ],
         ),
       ),
