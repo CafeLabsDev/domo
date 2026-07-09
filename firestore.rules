@@ -1,0 +1,188 @@
+rules_version = '2';
+
+// Domo Firestore Security Rules
+// =============================================================================
+// Posture: DEFAULT DENY. Only the paths matched below are reachable; every
+// other path (and every operation not explicitly allowed) is denied.
+//
+// DOMAIN MODEL (source of truth = the code in lib/features/casa + dispensa):
+//   casas/{casaId}                      one shared household
+//     .criadoPor   : string  -> uid of the OWNER. This — not `cargo` — is the
+//                               only authorization boundary for managing the
+//                               house. `cargo` ("Administrador"/"Membro") is a
+//                               cosmetic label and grants NOTHING here.
+//     .codigo      : string  -> 6-char join code (a shared secret).
+//     .membros     : map     -> { uid: { nome, cargo, fotoUrl, status } }
+//                               status is 'ativo' | 'pendente'. This map is the
+//                               SOURCE OF TRUTH for who may touch the house.
+//     .membrosAtivos: list   -> denormalized cache of the ativo uids, used only
+//                               by the client's `arrayContains` stream query.
+//                               It is NEVER trusted for authorization here
+//                               (a forged entry cannot grant read/write because
+//                               every check below reads the `membros` map).
+//   casas/{casaId}/itens/{itemId}       pantry items, one subcollection per house
+//     .status: 'tem' | 'nao_tem' | 'no_carrinho', plus nome/categoria/
+//     atualizadoEm/atualizadoPor.
+//   codigos/{CODE}                      join-code -> casaId lookup (see below).
+//
+// JOIN-BY-CODE — why `codigos/{CODE}` exists:
+//   A non-member must resolve a 6-char code to a casaId WITHOUT being able to
+//   read (or enumerate) houses they don't belong to. A Firestore `list`/query
+//   filtered by `codigo` cannot be secured — rules cannot force a where-clause,
+//   so allowing the query would let any signed-in user enumerate EVERY house.
+//   Instead, the code is the document id of a `codigos/{CODE}` doc holding only
+//   { casaId }. Resolving it is a `get` BY ID (you must already know the code),
+//   never a `list` — so there is no enumeration. See docs/BACKEND.md for the
+//   client change these rules require.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ----------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+    function next() {
+      return request.resource.data;
+    }
+    function prev() {
+      return resource.data;
+    }
+    function unchanged(field) {
+      return next()[field] == prev()[field];
+    }
+
+    // Authorization is always read off the `membros` MAP (source of truth),
+    // never off `membrosAtivos`. `prev()` = the currently-stored casa doc.
+    function isMemberOfCurrent() {
+      return signedIn() && uid() in prev().membros;
+    }
+    function isActiveMemberOfCurrent() {
+      return isMemberOfCurrent() && prev().membros[uid()].status == 'ativo';
+    }
+    function isOwnerOfCurrent() {
+      return signedIn() && prev().criadoPor == uid();
+    }
+
+    // For the itens subcollection we must reach up to the parent casa doc.
+    function casa(casaId) {
+      return get(/databases/$(database)/documents/casas/$(casaId)).data;
+    }
+    function isActiveMemberOf(casaId) {
+      return signedIn()
+        && uid() in casa(casaId).membros
+        && casa(casaId).membros[uid()].status == 'ativo';
+    }
+
+    // Only the caller's own key changed in the membros map.
+    function onlyOwnMembroKeyChanged() {
+      return next().membros.diff(prev().membros).affectedKeys().hasOnly([uid()]);
+    }
+
+    // ---- casas ------------------------------------------------------------
+
+    match /casas/{casaId} {
+
+      // GET (single doc by id): only members of THIS house (active OR pendente)
+      // may read it. A pendente reads it to see their own approval status.
+      // Non-members never read it. Authorized off the `membros` map.
+      allow get: if isMemberOfCurrent();
+
+      // LIST (collection query): the ONLY supported query is the client's
+      // `where membrosAtivos array-contains <uid>` household stream. We key
+      // this rule off the *queried* field so it (a) cannot crash on the
+      // constraint-only evaluation pass and (b) structurally limits results to
+      // houses where the caller is already an ativo member — a stranger can
+      // never enumerate houses they don't belong to. A caller only lands in a
+      // house's membrosAtivos via the owner (join-by-code cannot self-insert),
+      // so this stays consistent with the membros map.
+      allow list: if signedIn() && uid() in prev().membrosAtivos;
+
+      // CREATE: the creator seeds themselves as the sole, ATIVO owner.
+      allow create: if signedIn()
+        && next().criadoPor == uid()
+        && next().membros.keys().hasOnly([uid()])
+        && next().membros[uid()].status == 'ativo'
+        && next().membrosAtivos == [uid()]
+        && next().codigo is string
+        && next().nome is string;
+
+      // UPDATE: exactly three legitimate flows, nothing else.
+      allow update: if joinAsPending()
+        || ownerManages()
+        || selfLeave();
+
+      // DELETE: only the owner may delete the whole house.
+      allow delete: if isOwnerOfCurrent();
+
+      // (a) JOIN BY CODE — a NON-member adds ONLY themselves, as PENDENTE, and
+      //     touches nothing else (not nome/codigo/criadoPor/membrosAtivos, and
+      //     not any other member). They cannot self-approve (status must be
+      //     'pendente') and cannot slip into membrosAtivos.
+      function joinAsPending() {
+        return signedIn()
+          && !(uid() in prev().membros)
+          && unchanged('nome') && unchanged('codigo')
+          && unchanged('criadoPor') && unchanged('criadoEm')
+          && unchanged('membrosAtivos')
+          && onlyOwnMembroKeyChanged()
+          && uid() in next().membros
+          && next().membros[uid()].status == 'pendente';
+      }
+
+      // (b) OWNER MANAGES — the house owner approves (pendente->ativo, adding to
+      //     membrosAtivos), refuses/removes members, edits cargo, renames the
+      //     house. Immutable even for the owner: criadoPor, criadoEm, codigo.
+      function ownerManages() {
+        return isOwnerOfCurrent()
+          && unchanged('criadoPor') && unchanged('criadoEm')
+          && unchanged('codigo');
+      }
+
+      // (c) SELF-LEAVE — a member (active or pendente) removes ONLY themselves
+      //     from both the membros map and membrosAtivos, and cannot add anyone
+      //     else to the active list or change house metadata.
+      function selfLeave() {
+        return isMemberOfCurrent()
+          && unchanged('nome') && unchanged('codigo')
+          && unchanged('criadoPor') && unchanged('criadoEm')
+          && onlyOwnMembroKeyChanged()
+          && !(uid() in next().membros)
+          && !(uid() in next().membrosAtivos)
+          && next().membrosAtivos.hasOnly(prev().membrosAtivos);
+      }
+
+      // ---- itens (pantry) -------------------------------------------------
+      // Only ATIVO members of the parent house read or write pantry items.
+      // A pendente member is explicitly excluded here (limited access until
+      // approved).
+      match /itens/{itemId} {
+        allow read, delete: if isActiveMemberOf(casaId);
+        allow create, update: if isActiveMemberOf(casaId)
+          && next().status in ['tem', 'nao_tem', 'no_carrinho'];
+      }
+    }
+
+    // ---- codigos (join-code lookup) --------------------------------------
+    // Doc id IS the join code. Holds only { casaId } (optionally a display
+    // nome). Resolving a code is a `get` by id — you must already know the code
+    // — so there is no way to enumerate houses. Listing is denied outright.
+    match /codigos/{codigo} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      // The mapping is created AFTER the house exists (second write), so the
+      // get() below sees the committed casa and confirms the caller owns it.
+      allow create: if signedIn()
+        && next().keys().hasOnly(['casaId', 'nome'])
+        && casa(next().casaId).criadoPor == uid();
+      allow delete: if signedIn()
+        && casa(prev().casaId).criadoPor == uid();
+      allow update: if false;
+    }
+  }
+}
