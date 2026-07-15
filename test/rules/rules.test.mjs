@@ -268,6 +268,26 @@ describe('join by code', () => {
       }),
     );
   });
+
+  test('joiner cannot delete another member key while joining', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(STRANGER)), {
+        [`membros.${STRANGER}`]: membro(STRANGER, 'pendente', 'Membro'),
+        [`membros.${MEMBER}`]: deleteField(),
+      }),
+    );
+  });
+
+  test('joiner cannot add two membros keys at once (self + a new uid)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(STRANGER)), {
+        [`membros.${STRANGER}`]: membro(STRANGER, 'pendente', 'Membro'),
+        'membros.smuggled-uid': membro('smuggled-uid', 'pendente', 'Membro'),
+      }),
+    );
+  });
 });
 
 // -- member management (owner only) ------------------------------------------
@@ -329,6 +349,20 @@ describe('member management', () => {
     );
   });
 
+  test('owner cannot reassign ownership (criadoPor immutable)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(OWNER)), { criadoPor: STRANGER }),
+    );
+  });
+
+  test('owner cannot rewrite criadoEm', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(OWNER)), { criadoEm: new Date() }),
+    );
+  });
+
   test('non-owner cannot delete the casa', async () => {
     await seedCasa();
     await assertFails(deleteDoc(casaRef(db(MEMBER))));
@@ -359,6 +393,33 @@ describe('self leave', () => {
       updateDoc(casaRef(db(MEMBER)), {
         [`membros.${OWNER}`]: deleteField(),
         membrosAtivos: arrayRemove(OWNER),
+      }),
+    );
+  });
+
+  // REGRESSION GUARD for the selfLeave integrity fix. Before the fix this
+  // PASSED: a leaver removed only their OWN membros key (satisfying
+  // onlyOwnMembroKeyChanged) yet also blanked membrosAtivos, stripping the
+  // OWNER from the active list — the house vanishes from everyone's stream
+  // (griefing DoS). The three-line pin (next == prev \ {uid}) must reject it.
+  test('leaver cannot strip OTHER uids from membrosAtivos in the same write', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(MEMBER)), {
+        [`membros.${MEMBER}`]: deleteField(),
+        membrosAtivos: [], // drops MEMBER (legit) AND OWNER (griefing)
+      }),
+    );
+  });
+
+  // A pendente self-leave (not in membrosAtivos) must still be allowed: next
+  // membrosAtivos equals prev, and the pin tolerates uid() being absent.
+  test('pendente can self-leave (membros key removed, membrosAtivos untouched)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(PENDING)), {
+        [`membros.${PENDING}`]: deleteField(),
+        membrosAtivos: arrayRemove(PENDING), // no-op, PENDING wasn't in it
       }),
     );
   });
@@ -436,5 +497,94 @@ describe('itens', () => {
   test('active member deletes an item', async () => {
     await seedCasa();
     await assertSucceeds(deleteDoc(itemRef(db(MEMBER))));
+  });
+});
+
+// -- codigos (join-code lookup) write authorization --------------------------
+// These exercise the client co-change: criarCasa writes codigos/{CODE}, and
+// deletarCasa removes it. Only the house OWNER may create/delete the mapping;
+// updates are denied outright.
+
+describe('codigos write authorization', () => {
+  test('owner creates the codigos mapping for their house', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      setDoc(doc(db(OWNER), 'codigos', 'NEW123'), {
+        casaId: CASA_ID,
+        nome: 'Casa Teste',
+      }),
+    );
+  });
+
+  test('non-owner cannot create a codigos mapping for a house', async () => {
+    await seedCasa();
+    await assertFails(
+      setDoc(doc(db(MEMBER), 'codigos', 'NEW124'), {
+        casaId: CASA_ID,
+        nome: 'Casa Teste',
+      }),
+    );
+  });
+
+  test('codigos create with an extra field beyond {casaId,nome} is rejected', async () => {
+    await seedCasa();
+    await assertFails(
+      setDoc(doc(db(OWNER), 'codigos', 'NEW125'), {
+        casaId: CASA_ID,
+        nome: 'Casa Teste',
+        rogue: 'x',
+      }),
+    );
+  });
+
+  test('codigos cannot be updated (immutable mapping)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(doc(db(OWNER), 'codigos', CODE), { casaId: 'outra-casa' }),
+    );
+  });
+
+  test('non-owner cannot delete a codigos mapping', async () => {
+    await seedCasa();
+    await assertFails(deleteDoc(doc(db(MEMBER), 'codigos', CODE)));
+  });
+
+  test('owner deletes the codigos mapping (delete-house co-change)', async () => {
+    await seedCasa();
+    await assertSucceeds(deleteDoc(doc(db(OWNER), 'codigos', CODE)));
+  });
+});
+
+// -- unauthenticated writes are denied everywhere ----------------------------
+
+describe('unauthenticated writes', () => {
+  test('anon cannot create a casa', async () => {
+    await assertFails(
+      setDoc(doc(anon(), 'casas', 'anon1'), {
+        nome: 'Nova',
+        codigo: 'XYZ789',
+        criadoPor: STRANGER,
+        criadoEm: new Date(),
+        membrosAtivos: [STRANGER],
+        membros: { [STRANGER]: membro(STRANGER, 'ativo', 'Administrador') },
+      }),
+    );
+  });
+
+  test('anon cannot write an item', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(anon()), { status: 'no_carrinho' }),
+    );
+  });
+
+  test('anon cannot create a codigos mapping', async () => {
+    await seedCasa();
+    await assertFails(
+      setDoc(doc(anon(), 'codigos', 'ANON99'), {
+        casaId: CASA_ID,
+        nome: 'Casa Teste',
+      }),
+    );
   });
 });

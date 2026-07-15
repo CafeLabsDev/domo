@@ -16,10 +16,16 @@ reviewed action. Before running any `firebase deploy --only firestore:rules`:
    `gcloud firestore export gs://<bucket>` if a bucket is available, OR, at MVP
    scale, manually copy the current `casas` docs from the Firebase console.
    This is the only rollback for user data.
-2. **Confirm the client co-change shipped (see "Join-by-code" below).** These
-   rules intentionally break the *current* join-by-code flow. Deploying the
-   rules WITHOUT the client change will make joining a house fail. They must
-   deploy together.
+2. **Confirm the client co-change shipped — all THREE edits (see "Join-by-code"
+   below).** These rules intentionally break the *current* join-by-code flow.
+   Deploying the rules WITHOUT the client change will make joining a house fail.
+   Rules + all three client edits ship in the SAME deploy. The gate must verify
+   the three together — a partial client change (e.g. `criarCasa` writing
+   `codigos` but `entrarNaCasa` still querying `casas` by `codigo`) is as broken
+   as no change at all. The three edits:
+   - `criarCasa` writes `codigos/{CODE} = {casaId, nome}` after the house doc.
+   - `entrarNaCasa` does `get codigos/{CODE}` → `casaId` (no more `casas` query).
+   - `deletarCasa` deletes `codigos/{CODE}` alongside the house.
 3. **Keep the previous ruleset id.** `firebase deploy` prints/stores it; rules
    roll back with `firebase deploy` of the prior `firestore.rules`. Rules are
    versioned in git here, so the rollback artifact is just the previous commit.
@@ -88,18 +94,86 @@ query cannot be secured** — Firestore rules cannot force a `where` clause, so
 allowing the query at all lets any signed-in user enumerate and read *every*
 house. The rules here therefore **deny** that query on purpose.
 
-The secure replacement (rules for it are already in `firestore.rules`):
+The secure replacement (rules for it are already in `firestore.rules`) is
+**three edits to `CasaRepositoryImpl`**, all required, all shipped together:
 
-1. On **create house**: after writing `casas/{id}`, write `codigos/{CODE}` =
-   `{ casaId, nome }` (second write, so the ownership `get()` in the rule sees
-   the committed house).
-2. On **join**: `get codigos/{CODE}` → `casaId` (a get BY ID — you must know the
-   6-char code, no enumeration), then the existing self-add-as-`pendente`
-   update on `casas/{casaId}`.
-3. On **delete house**: also delete `codigos/{CODE}`.
+1. **`criarCasa`** (currently `casa_repository_impl.dart` ~L56-63): today it
+   writes ONLY `casas/{id}` and never touches `codigos`. Add a second write:
+   `codigos/{CODE} = { casaId, nome }`, AFTER the house doc exists (the rule's
+   ownership `get()` must see the committed house). `{CODE}` is the doc id.
+2. **`entrarNaCasa`** (currently ~L81-84, `casas.where('codigo', ==, X)`):
+   replace the collection query with `get codigos/{CODE}` → `casaId` (a get BY
+   ID — you must already know the 6-char code, no enumeration), then keep the
+   existing self-add-as-`pendente` update on `casas/{casaId}`.
+3. **`deletarCasa`** (currently ~L160-162, deletes only the house): also delete
+   `codigos/{CODE}` so codes don't dangle.
 
-Until `CasaRepositoryImpl` is changed this way, join-by-code will fail under the
-new rules — so rules + this client change deploy together (see deploy gate).
+Until all three land, join-by-code fails under the new rules — so rules + these
+three edits deploy together (see deploy gate step 2). The rules test suite
+covers the server side of all three (`codigos` create/delete owner-only,
+get-by-id resolve, list denied).
+
+## Post-deploy smoke test (there is no staging)
+
+Spark has no separate staging project, so the only end-to-end verification is
+against `domo-8b336` itself, right after deploy, with throwaway accounts. Do
+this before considering the deploy done:
+
+1. Two test Auth accounts (A and B).
+2. As A: create a house. Confirm the house doc AND a `codigos/{CODE}` doc both
+   appear (proves the `criarCasa` co-change wrote the mapping).
+3. As B: join by that code. Confirm B lands as `pendente` and can read the
+   house but not its items.
+4. As A: approve B. Confirm B now appears in `membrosAtivos`, B's stream shows
+   the house, and B can read/write items.
+5. As B: leave. Confirm B is gone from both `membros` and `membrosAtivos`, and
+   A is still present in `membrosAtivos` (the self-leave integrity fix).
+6. As A: delete the house. Confirm both the house doc and `codigos/{CODE}` are
+   gone. Clean up the test accounts.
+
+## Accepted risk: join-code brute force (pilot-scoped)
+
+The join code is 6 chars. At the app's charset it is roughly **~29.7 bits** of
+entropy, and on Spark there is **no server-side rate limit** on the
+`get codigos/{CODE}` lookup (rate limiting a read would need a Cloud Function
+gatekeeper, i.e. Blaze). So a determined attacker could, in principle, script
+guesses against the lookup. At pilot scale (a handful of houses among a 6-char
+space of ~1e9) a random guess almost never hits a live code, and the blast
+radius of one hit is one house's grocery list — **accepted FOR THE PILOT.**
+
+Before onboarding real users beyond the pilot:
+- **Enable Firebase App Check (free on Spark).** It blocks lookups from clients
+  that aren't the genuine app, which shuts down scripted brute force without any
+  paid plan. This is the recommended next hardening step and costs nothing.
+- A true server-side rate limit / lockout (per-IP or per-account throttling on
+  the resolve) would require moving the join resolve into a **Cloud Function**,
+  which needs the **Blaze** pay-as-you-go plan. Named as a trade-off, not
+  assumed — App Check should be tried first since it's free.
+
+## Deferred advisories (LOW severity, recorded not fixed)
+
+- **Owner self-leave orphans the house.** The rules let an owner take the
+  self-leave path (they are a member). If they do, they drop out of `membros`
+  and `membrosAtivos` — losing `read`, since reads are keyed off `membros` — but
+  `criadoPor` still points at them, so they keep `delete`/`ownerManages` rights
+  and no one else is promoted to owner. The house is left with members but no
+  reachable owner. Low impact at MVP (the app's UI doesn't offer "leave" to the
+  owner), so deferred post-MVP. A proper fix is either blocking owner self-leave
+  in the rules or transferring `criadoPor` on leave — both need a client flow,
+  so they belong to the same wave as ownership transfer.
+- **`codigos` doc id not validated against `casa.codigo`.** An owner could
+  create a mapping whose id differs from their house's `codigo` field. Harmless
+  post-migration: joining resolves via the mapping's id, so `casa.codigo`
+  becomes decorative and the id is the real code. Enforcing equality would cost
+  a second `get()` for no security gain. Noted in `firestore.rules`; deferred.
+- **`itens` writes don't pin `atualizadoPor == uid()`.** Considered as
+  hardening but NOT applied: the client's `atualizarItem` (name/category edit,
+  `dispensa_repository_impl.dart` ~L44-54) updates an item WITHOUT rewriting
+  `atualizadoPor`, so a rule requiring `next().atualizadoPor == uid()` on every
+  update would reject that legitimate flow (the field keeps a prior user's uid).
+  The write is already gated to `ativo` members of the house, so the only gap is
+  cosmetic attribution within a trusted household. Deferred; revisit only if the
+  client is changed to always stamp `atualizadoPor`.
 
 ## User data: export & deletion (privacy baseline)
 
@@ -127,11 +201,20 @@ firebase emulators:exec --only firestore --project domo-rules-test \
   "node --test test/rules/rules.test.mjs"
 ```
 
-(If `node` resolves to firebase's bundled binary inside `emulators:exec`, use an
-absolute path to a real Node 20+.) Covers: non-member blocked, pendente limited
-(reads house, blocked from items), ativo member OK, owner-only approval/removal,
+(`node` inside `emulators:exec` resolves to firebase's bundled pkg binary, which
+does NOT support `--test`; pass an absolute path to a real Node 20+ as above.)
+
+**50 tests, all passing.** Covers: non-member blocked, pendente limited (reads
+house, blocked from items), ativo member OK, owner-only approval/removal,
 self-join-as-pendente invariants (no self-approve, no `membrosAtivos` insert, no
-touching others), self-leave, item status validation, and `codigos` get-only.
+touching others, no two-key add, no deleting another's key), self-leave
+including the integrity guard (a leaver CANNOT strip other uids from
+`membrosAtivos`), owner-immutability of `criadoPor`/`criadoEm`/`codigo`, item
+status validation, `codigos` get-only + owner-only create/delete + extra-field
+rejection + update-denied, and unauthenticated writes denied on
+`casas`/`itens`/`codigos`. The self-leave griefing test is a regression guard:
+it passes only because of the three-line `next == prev \ {uid}` pin in
+`selfLeave()`; removing that pin makes it fail (verified).
 
 ## Cost note
 

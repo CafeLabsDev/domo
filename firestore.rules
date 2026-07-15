@@ -145,15 +145,21 @@ service cloud.firestore {
 
       // (c) SELF-LEAVE — a member (active or pendente) removes ONLY themselves
       //     from both the membros map and membrosAtivos, and cannot add anyone
-      //     else to the active list or change house metadata.
+      //     else to the active list, remove anyone else, or change house
+      //     metadata.
       function selfLeave() {
         return isMemberOfCurrent()
           && unchanged('nome') && unchanged('codigo')
           && unchanged('criadoPor') && unchanged('criadoEm')
           && onlyOwnMembroKeyChanged()
           && !(uid() in next().membros)
-          && !(uid() in next().membrosAtivos)
-          && next().membrosAtivos.hasOnly(prev().membrosAtivos);
+          // membrosAtivos must become EXACTLY prev \ {uid} — no more, no less.
+          // The subset check alone (no additions) let a leaver ALSO strip OTHER
+          // uids from membrosAtivos in the same write, hiding the shared house
+          // from everyone else's stream (griefing DoS). All three lines pin it.
+          && next().membrosAtivos.hasOnly(prev().membrosAtivos)                  // no additions
+          && prev().membrosAtivos.hasOnly(next().membrosAtivos.concat([uid()]))  // removed at most uid()
+          && !(uid() in next().membrosAtivos);                                   // removed uid()
       }
 
       // ---- itens (pantry) -------------------------------------------------
@@ -177,6 +183,12 @@ service cloud.firestore {
 
       // The mapping is created AFTER the house exists (second write), so the
       // get() below sees the committed casa and confirms the caller owns it.
+      // NOTE (accepted): the doc id ({codigo}) is NOT checked against
+      // casa.codigo — an owner could create a mapping under a code that differs
+      // from their house's `codigo` field. Harmless post-migration: joining
+      // resolves the code via THIS doc's id, so `casa.codigo` becomes
+      // decorative and the mapping id is the real code. Enforcing equality
+      // would add a second get() (cost) for no security gain.
       allow create: if signedIn()
         && next().keys().hasOnly(['casaId', 'nome'])
         && casa(next().casaId).criadoPor == uid();
