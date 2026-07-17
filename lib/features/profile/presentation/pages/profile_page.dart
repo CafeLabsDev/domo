@@ -11,6 +11,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../casa/domain/models/casa_model.dart';
 import '../../../casa/domain/models/membro_model.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
+import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class ProfilePage extends ConsumerWidget {
@@ -27,7 +28,12 @@ class ProfilePage extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(body: Center(child: Text('Erro: $e'))),
+      error: (e, _) => Scaffold(
+        body: DomoErrorState(
+          title: 'Não foi possível carregar sua casa.',
+          onRetry: () => ref.invalidate(casaDoUsuarioProvider),
+        ),
+      ),
       data: (casa) => _ProfileContent(user: user, casa: casa),
     );
   }
@@ -99,6 +105,7 @@ class _ProfileContent extends ConsumerWidget {
               child: Column(
                 children: [
                   _Avatar(
+                    userId: user.uid,
                     photoUrl: user.photoURL,
                     nome: user.displayName ?? user.email ?? '?',
                   ),
@@ -199,7 +206,9 @@ class _ProfileContent extends ConsumerWidget {
             Text(
               'Domo — um produto Café Labs',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: theme.brightness == Brightness.dark
+                    ? AppColors.inkSubtleDark
+                    : AppColors.inkSubtleLight,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -211,8 +220,13 @@ class _ProfileContent extends ConsumerWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.photoUrl, required this.nome});
+  const _Avatar({
+    required this.userId,
+    required this.photoUrl,
+    required this.nome,
+  });
 
+  final String userId;
   final String? photoUrl;
   final String nome;
 
@@ -221,36 +235,51 @@ class _Avatar extends StatelessWidget {
     const radius = 52.0;
 
     if (photoUrl != null && photoUrl!.isNotEmpty) {
+      final (memberColor, _) = AppColors.memberColorFor(
+        userId,
+        Theme.of(context).brightness,
+      );
       return CircleAvatar(
         radius: radius,
         backgroundImage: CachedNetworkImageProvider(photoUrl!),
         onBackgroundImageError: (_, _) {},
-        backgroundColor: AppColors.primary,
+        backgroundColor: memberColor,
       );
     }
 
-    return _Initials(nome: nome, radius: radius);
+    return _Initials(userId: userId, nome: nome, radius: radius);
   }
 }
 
+/// Member-color avatar (docs/DESIGN.md §1.3/§4.6) — deterministic per
+/// `userId`, "this is the whole house's list, not mine" signal.
 class _Initials extends StatelessWidget {
-  const _Initials({required this.nome, required this.radius});
+  const _Initials({
+    required this.userId,
+    required this.nome,
+    required this.radius,
+  });
 
+  final String userId;
   final String nome;
   final double radius;
 
   @override
   Widget build(BuildContext context) {
     final initial = nome.isNotEmpty ? nome[0].toUpperCase() : '?';
+    final (bgColor, onColor) = AppColors.memberColorFor(
+      userId,
+      Theme.of(context).brightness,
+    );
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.primary,
+      backgroundColor: bgColor,
       child: Text(
         initial,
         style: TextStyle(
           fontSize: radius * 0.8,
           fontWeight: FontWeight.w700,
-          color: AppColors.onPrimary,
+          color: onColor,
         ),
       ),
     );

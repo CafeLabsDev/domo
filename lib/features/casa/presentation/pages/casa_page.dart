@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/membro_model.dart';
 import '../providers/casa_controller.dart';
 import '../providers/casa_provider.dart';
+import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class CasaPage extends ConsumerWidget {
@@ -85,7 +86,10 @@ class CasaPage extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        body: Center(child: Text('Erro: $e')),
+        body: DomoErrorState(
+          title: 'Não foi possível carregar sua casa.',
+          onRetry: () => ref.invalidate(casaDoUsuarioProvider),
+        ),
       ),
       data: (casa) {
         if (casa == null) {
@@ -132,10 +136,11 @@ class CasaPage extends ConsumerWidget {
                       value: _MenuAcao.deletar,
                       child: ListTile(
                         leading: Icon(Icons.delete_forever,
-                            color: AppColors.error),
+                            color: Theme.of(context).colorScheme.error),
                         title: Text(
                           'Deletar casa',
-                          style: TextStyle(color: AppColors.error),
+                          style:
+                              TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -182,10 +187,12 @@ class CasaPage extends ConsumerWidget {
                           casa.codigo,
                           style: Theme.of(context)
                               .textTheme
-                              .titleLarge
+                              .headlineSmall
                               ?.copyWith(
-                                fontWeight: FontWeight.w800,
                                 letterSpacing: 6,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                                 color: Theme.of(context)
                                     .colorScheme
                                     .onPrimaryContainer,
@@ -202,7 +209,10 @@ class CasaPage extends ConsumerWidget {
                 child: membrosAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Erro: $e')),
+                  error: (e, _) => DomoErrorState(
+                    title: 'Não foi possível carregar os membros da casa.',
+                    onRetry: () => ref.invalidate(membrosProvider(casa.id)),
+                  ),
                   data: (membros) {
                     final ativos = membros
                         .where((m) => m.status == MembroStatus.ativo)
@@ -322,23 +332,43 @@ class _MembroTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final podeRemover = isAdmin &&
         !isPending &&
         membro.userId != currentUserId;
+    final (memberColor, onMemberColor) =
+        AppColors.memberColorFor(membro.userId, theme.brightness);
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: ListTile(
         leading: CircleAvatar(
+          backgroundColor: memberColor,
           backgroundImage: membro.fotoUrl != null
               ? CachedNetworkImageProvider(membro.fotoUrl!)
               : null,
           child: membro.fotoUrl == null
-              ? Text(membro.nome[0].toUpperCase())
+              ? Text(
+                  membro.nome[0].toUpperCase(),
+                  style: TextStyle(color: onMemberColor),
+                )
               : null,
         ),
         title: Text(membro.nome),
-        subtitle: Text(membro.cargo),
+        subtitle: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: Text(membro.cargo)),
+            // Non-admin viewers see no approve/reject icons on a pending
+            // row (admin-gated below) — this pill is the "what does a
+            // non-admin see instead" cue that the row is in a different
+            // state (docs/DESIGN.md §4.6).
+            if (isPending) ...[
+              const SizedBox(width: AppSpacing.sm),
+              const _PendenteChip(),
+            ],
+          ],
+        ),
         trailing: isPending && isAdmin
             ? Row(
                 mainAxisSize: MainAxisSize.min,
@@ -369,6 +399,32 @@ class _MembroTile extends ConsumerWidget {
                     onPressed: () => _confirmarRemocao(context, ref),
                   )
                 : null,
+      ),
+    );
+  }
+}
+
+/// Outlined "Pendente" pill (docs/DESIGN.md §4.6) — `border` token outline,
+/// `inkSubtle` text, no fill.
+class _PendenteChip extends StatelessWidget {
+  const _PendenteChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final inkSubtle =
+        isDark ? AppColors.inkSubtleDark : AppColors.inkSubtleLight;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outline),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+      ),
+      child: Text(
+        'Pendente',
+        style: theme.textTheme.labelMedium?.copyWith(color: inkSubtle),
       ),
     );
   }
@@ -494,17 +550,17 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
         FilledButton(
           onPressed: _podeConfirmar ? _confirmar : null,
           style: FilledButton.styleFrom(
-            backgroundColor: AppColors.error,
-            foregroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.error,
+            foregroundColor: theme.colorScheme.onError,
             minimumSize: const Size(88, 44),
           ),
           child: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: theme.colorScheme.onError,
                   ),
                 )
               : const Text('Deletar'),

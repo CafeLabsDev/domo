@@ -94,7 +94,7 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
                       ],
                       style: theme.textTheme.headlineSmall?.copyWith(
                         letterSpacing: 8,
-                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
@@ -116,12 +116,12 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
                     FilledButton(
                       onPressed: isLoading ? null : _entrar,
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Solicitar Entrada'),

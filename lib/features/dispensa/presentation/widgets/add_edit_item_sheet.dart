@@ -25,6 +25,8 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
   late final TextEditingController _nomeController;
   late String _categoria;
   bool _isLoading = false;
+  String? _nomeError;
+  String? _saveError;
 
   bool get _isEditing => widget.item != null;
 
@@ -43,9 +45,19 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
 
   Future<void> _save() async {
     final nome = _nomeController.text.trim();
-    if (nome.isEmpty) return;
+    if (nome.isEmpty) {
+      setState(() {
+        _nomeError = 'Digite um nome para o item.';
+        _saveError = null;
+      });
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _nomeError = null;
+      _saveError = null;
+    });
 
     try {
       final repo = ref.read(dispensaRepositoryProvider);
@@ -70,7 +82,12 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
 
       if (mounted) Navigator.pop(context);
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _saveError = 'Não foi possível salvar. Tente novamente.';
+        });
+      }
     }
   }
 
@@ -107,9 +124,13 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
             controller: _nomeController,
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
+            onChanged: (_) {
+              if (_nomeError != null) setState(() => _nomeError = null);
+            },
+            decoration: InputDecoration(
               labelText: 'Nome do item',
               hintText: 'Ex: Leite integral',
+              errorText: _nomeError,
             ),
             onSubmitted: (_) => _save(),
           ),
@@ -125,16 +146,25 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
                 .map((c) => DropdownMenuEntry(value: c, label: c))
                 .toList(),
           ),
+          if (_saveError != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _saveError!,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
           FilledButton(
             onPressed: _isLoading ? null : _save,
             child: _isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   )
                 : Text(_isEditing ? 'Salvar' : 'Adicionar'),

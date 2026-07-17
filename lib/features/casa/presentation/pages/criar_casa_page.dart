@@ -95,12 +95,12 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
                     FilledButton(
                       onPressed: isLoading ? null : _criar,
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Criar Casa'),

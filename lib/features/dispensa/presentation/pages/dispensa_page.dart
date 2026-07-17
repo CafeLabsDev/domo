@@ -8,6 +8,7 @@ import '../providers/dispensa_controller.dart';
 import '../providers/dispensa_provider.dart';
 import '../widgets/add_edit_item_sheet.dart';
 import '../widgets/pantry_item_card.dart';
+import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class DispensaPage extends ConsumerWidget {
@@ -22,7 +23,10 @@ class DispensaPage extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        body: Center(child: Text('Erro: $e')),
+        body: DomoErrorState(
+          title: 'Não foi possível carregar sua casa.',
+          onRetry: () => ref.invalidate(casaDoUsuarioProvider),
+        ),
       ),
       data: (casa) {
         if (casa == null) return const Scaffold(body: SizedBox.shrink());
@@ -64,7 +68,10 @@ class _DispensaContent extends ConsumerWidget {
       ),
       body: itensAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Erro ao carregar itens: $e')),
+        error: (e, _) => DomoErrorState(
+          title: 'Não foi possível carregar sua dispensa.',
+          onRetry: () => ref.invalidate(itensProvider(casaId)),
+        ),
         data: (todos) {
           final itens = todos
               .where((i) => i.status != ItemStatus.noCarrinho)

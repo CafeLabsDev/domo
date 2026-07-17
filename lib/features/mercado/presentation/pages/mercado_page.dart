@@ -7,6 +7,7 @@ import '../../../casa/presentation/providers/casa_provider.dart';
 import '../../../dispensa/domain/models/pantry_item.dart';
 import '../../../dispensa/presentation/providers/dispensa_controller.dart';
 import '../../../dispensa/presentation/providers/dispensa_provider.dart';
+import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
 class MercadoPage extends ConsumerWidget {
@@ -20,7 +21,12 @@ class MercadoPage extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(body: Center(child: Text('Erro: $e'))),
+      error: (e, _) => Scaffold(
+        body: DomoErrorState(
+          title: 'Não foi possível carregar sua casa.',
+          onRetry: () => ref.invalidate(casaDoUsuarioProvider),
+        ),
+      ),
       data: (casa) {
         if (casa == null) return const Scaffold(body: SizedBox.shrink());
         return _MercadoContent(casaId: casa.id);
@@ -46,7 +52,10 @@ class _MercadoContent extends ConsumerWidget {
       ),
       body: itensAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Erro: $e')),
+        error: (e, _) => DomoErrorState(
+          title: 'Não foi possível carregar sua lista de compras.',
+          onRetry: () => ref.invalidate(itensProvider(casaId)),
+        ),
         data: (todos) {
           final itens = todos
               .where((i) =>
@@ -64,6 +73,7 @@ class _MercadoContent extends ConsumerWidget {
             onToggleItem: (item) => controller.atualizarStatus(
               casaId: item.casaId,
               itemId: item.id,
+              statusAnterior: item.status,
               novoStatus: item.status == ItemStatus.noCarrinho
                   ? ItemStatus.naoTem
                   : ItemStatus.noCarrinho,
@@ -167,7 +177,13 @@ class _MercadoItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final noCarrinho = item.status == ItemStatus.noCarrinho;
+    // statusCarrinho reuses the `tertiary` token (docs/DESIGN.md §1.1: "in
+    // the cart" borrows the collective-action accent).
+    final statusCarrinho =
+        isDark ? AppColors.statusCarrinhoDark : AppColors.statusCarrinhoLight;
+    final onStatusCarrinho = theme.colorScheme.onTertiary;
 
     return InkWell(
       onTap: onToggle,
@@ -181,16 +197,14 @@ class _MercadoItemTile extends StatelessWidget {
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: noCarrinho ? AppColors.statusInCart : Colors.transparent,
+                color: noCarrinho ? statusCarrinho : Colors.transparent,
                 border: Border.all(
-                  color: noCarrinho
-                      ? AppColors.statusInCart
-                      : theme.colorScheme.outline,
+                  color: noCarrinho ? statusCarrinho : theme.colorScheme.outline,
                   width: 2,
                 ),
               ),
               child: noCarrinho
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  ? Icon(Icons.check, size: 14, color: onStatusCarrinho)
                   : null,
             ),
             const SizedBox(width: 14),
@@ -210,8 +224,8 @@ class _MercadoItemTile extends StatelessWidget {
               Text(
                 'No carrinho',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.statusInCart,
-                  fontWeight: FontWeight.w600,
+                  color: statusCarrinho,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
           ],

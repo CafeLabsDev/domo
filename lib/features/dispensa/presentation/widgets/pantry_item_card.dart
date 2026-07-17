@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/dispensa_controller.dart';
 
@@ -29,8 +30,8 @@ class PantryItemCard extends ConsumerWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: AppColors.error,
-        child: const Icon(Icons.delete_outline, color: Colors.white),
+        color: theme.colorScheme.error,
+        child: Icon(Icons.delete_outline, color: theme.colorScheme.onError),
       ),
       confirmDismiss: (_) => showDialog<bool>(
         context: context,
@@ -78,6 +79,7 @@ class PantryItemCard extends ConsumerWidget {
                 onTap: () => controller.atualizarStatus(
                   casaId: item.casaId,
                   itemId: item.id,
+                  statusAnterior: item.status,
                   novoStatus: item.status == ItemStatus.tem
                       ? ItemStatus.naoTem
                       : ItemStatus.tem,
@@ -97,10 +99,13 @@ class _StatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (status) {
-      ItemStatus.tem => AppColors.statusHave,
-      ItemStatus.naoTem => AppColors.statusNeed,
-      ItemStatus.noCarrinho => AppColors.statusInCart,
+      ItemStatus.tem => isDark ? AppColors.statusTemDark : AppColors.statusTemLight,
+      ItemStatus.naoTem =>
+        isDark ? AppColors.statusFaltaDark : AppColors.statusFaltaLight,
+      ItemStatus.noCarrinho =>
+        isDark ? AppColors.statusCarrinhoDark : AppColors.statusCarrinhoLight,
     };
     return Container(
       width: 10,
@@ -110,6 +115,12 @@ class _StatusDot extends StatelessWidget {
   }
 }
 
+/// Everyday tonal chip — recolored per docs/DESIGN.md §1.1/§4.1 to fix a
+/// real contrast bug: the previous implementation rendered the saturated
+/// status color as text directly over that *same* color at 12–15% alpha,
+/// which lands at 3.6–4.4:1 (below the 4.5:1 a ~12px label needs). Fixed by
+/// using a dedicated container/on-container hex pair per status (same
+/// recipe as `primaryContainer`/`tertiaryContainer`), landing 9–11:1.
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status, required this.onTap});
   final ItemStatus status;
@@ -117,19 +128,34 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (color, bgColor) = switch (status) {
-      ItemStatus.tem => (
-          AppColors.statusHave,
-          AppColors.statusHave.withValues(alpha: 0.12),
-        ),
-      ItemStatus.naoTem => (
-          AppColors.statusNeed,
-          AppColors.statusNeed.withValues(alpha: 0.12),
-        ),
-      ItemStatus.noCarrinho => (
-          AppColors.statusInCart,
-          AppColors.statusInCart.withValues(alpha: 0.15),
-        ),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final (bgColor, textColor) = switch (status) {
+      ItemStatus.tem => isDark
+          ? (AppColors.statusTemContainerDark, AppColors.onStatusTemContainerDark)
+          : (
+              AppColors.statusTemContainerLight,
+              AppColors.onStatusTemContainerLight
+            ),
+      ItemStatus.naoTem => isDark
+          ? (
+              AppColors.statusFaltaContainerDark,
+              AppColors.onStatusFaltaContainerDark
+            )
+          : (
+              AppColors.statusFaltaContainerLight,
+              AppColors.onStatusFaltaContainerLight
+            ),
+      ItemStatus.noCarrinho => isDark
+          ? (
+              AppColors.statusCarrinhoContainerDark,
+              AppColors.onStatusCarrinhoContainerDark
+            )
+          : (
+              AppColors.statusCarrinhoContainerLight,
+              AppColors.onStatusCarrinhoContainerLight
+            ),
     };
 
     return GestureDetector(
@@ -138,15 +164,15 @@ class _StatusChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          // Squared-off "label tag" shape, not a full pill — docs/DESIGN.md
+          // §3: the single biggest tactile differentiator from Dindin.
+          borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
         ),
         child: Text(
           status.label,
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: textColor,
+            letterSpacing: 0.2,
           ),
         ),
       ),

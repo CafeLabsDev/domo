@@ -164,12 +164,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     FilledButton(
                       onPressed: isLoading ? null : _signIn,
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Entrar'),

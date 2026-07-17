@@ -182,12 +182,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     FilledButton(
                       onPressed: isLoading ? null : _register,
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Criar Conta'),
