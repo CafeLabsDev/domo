@@ -6,7 +6,7 @@ part of 'casa_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$casaRepositoryHash() => r'd07491de963f5d1fe06453303da7c019245bf894';
+String _$casaRepositoryHash() => r'65b7f6529f9f81af4c3666ba57f425a3008cae25';
 
 /// See also [casaRepository].
 @ProviderFor(casaRepository)

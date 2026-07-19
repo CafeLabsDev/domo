@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/analytics/analytics_provider.dart';
 import '../../data/repositories/casa_repository_impl.dart';
 import '../../domain/models/casa_model.dart';
 import '../../domain/models/membro_model.dart';
@@ -10,7 +11,7 @@ part 'casa_provider.g.dart';
 
 @riverpod
 CasaRepository casaRepository(CasaRepositoryRef ref) {
-  return CasaRepositoryImpl();
+  return CasaRepositoryImpl(analytics: ref.watch(analyticsServiceProvider));
 }
 
 @riverpod
