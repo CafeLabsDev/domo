@@ -7,7 +7,7 @@ part of 'dispensa_controller.dart';
 // **************************************************************************
 
 String _$dispensaControllerHash() =>
-    r'02c9775ead480339f467b0a37d423fd53807f00f';
+    r'6b74fa8b075c99b746f4cbeb2dc796a414bb606f';
 
 /// See also [DispensaController].
 @ProviderFor(DispensaController)

@@ -52,6 +52,7 @@ class DispensaController extends _$DispensaController {
   Future<void> atualizarStatus({
     required String casaId,
     required String itemId,
+    required ItemStatus statusAnterior,
     required ItemStatus novoStatus,
   }) async {
     final user = ref.read(authStateProvider).valueOrNull;
@@ -61,6 +62,7 @@ class DispensaController extends _$DispensaController {
       () => ref.read(dispensaRepositoryProvider).atualizarStatus(
             casaId: casaId,
             itemId: itemId,
+            statusAnterior: statusAnterior,
             novoStatus: novoStatus,
             userId: user.uid,
           ),

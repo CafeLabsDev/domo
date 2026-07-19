@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/analytics/analytics_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/repositories/dispensa_repository.dart';
 
 class DispensaRepositoryImpl implements DispensaRepository {
+  DispensaRepositoryImpl({AnalyticsService? analytics})
+      : _analytics = analytics ?? AnalyticsService();
+
   final _firestore = FirebaseFirestore.instance;
+  final AnalyticsService _analytics;
 
   CollectionReference<Map<String, dynamic>> _itensRef(String casaId) =>
       _firestore.collection('casas').doc(casaId).collection('itens');
@@ -57,6 +64,7 @@ class DispensaRepositoryImpl implements DispensaRepository {
   Future<void> atualizarStatus({
     required String casaId,
     required String itemId,
+    required ItemStatus statusAnterior,
     required ItemStatus novoStatus,
     required String userId,
   }) async {
@@ -65,6 +73,13 @@ class DispensaRepositoryImpl implements DispensaRepository {
       'atualizadoEm': FieldValue.serverTimestamp(),
       'atualizadoPor': userId,
     });
+
+    unawaited(
+      _analytics.logItemStatusAlterado(
+        statusAnterior: statusAnterior.firestoreValue,
+        statusNovo: novoStatus.firestoreValue,
+      ),
+    );
   }
 
   @override
@@ -90,5 +105,9 @@ class DispensaRepositoryImpl implements DispensaRepository {
       });
     }
     await batch.commit();
+
+    unawaited(
+      _analytics.logCarrinhoFechado(quantidadeItens: itemIds.length),
+    );
   }
 }

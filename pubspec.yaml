@@ -14,6 +14,7 @@ dependencies:
   firebase_core: ^3.13.1
   firebase_auth: ^5.5.2
   cloud_firestore: ^5.6.7
+  firebase_analytics: ^11.4.4
   # State Management
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
@@ -41,6 +42,10 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
 
+  # Testing
+  fake_cloud_firestore: ^3.1.0
+  mocktail: ^1.0.4
+
   # Code generation
   build_runner: ^2.4.15
   freezed: ^3.0.0
@@ -61,7 +66,7 @@ flutter_launcher_icons:
   android: true
   min_sdk_android: 21
   adaptive_icon_foreground: "assets/icons/icon_foreground.png"
-  adaptive_icon_background: "#F8F5EF"
+  adaptive_icon_background: "#EEF1F1"
 
   # iOS (caso queira no futuro)
   ios: false
@@ -70,5 +75,5 @@ flutter_launcher_icons:
   web:
     generate: true
     image_path: "assets/icons/icon.png"
-    background_color: "#F8F5EF"
-    theme_color: "#4A7C59"
+    background_color: "#EEF1F1"
+    theme_color: "#2C4A7C"

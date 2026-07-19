@@ -20,6 +20,7 @@ abstract class DispensaRepository {
   Future<void> atualizarStatus({
     required String casaId,
     required String itemId,
+    required ItemStatus statusAnterior,
     required ItemStatus novoStatus,
     required String userId,
   });
