@@ -1,0 +1,8 @@
+# NEVER commit a service-account key. A committed credential is compromised
+# forever (git history), not just until it's removed. The backfill reads the
+# key path from GOOGLE_APPLICATION_CREDENTIALS at runtime — the file itself
+# stays out of the repo.
+*serviceAccount*.json
+*service-account*.json
+*.key.json
+serviceAccountKey.json

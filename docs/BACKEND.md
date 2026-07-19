@@ -26,10 +26,22 @@ reviewed action. Before running any `firebase deploy --only firestore:rules`:
    - `criarCasa` writes `codigos/{CODE} = {casaId, nome}` after the house doc.
    - `entrarNaCasa` does `get codigos/{CODE}` → `casaId` (no more `casas` query).
    - `deletarCasa` deletes `codigos/{CODE}` alongside the house.
-3. **Keep the previous ruleset id.** `firebase deploy` prints/stores it; rules
+3. **Backfill `codigos/{CODE}` for PRE-EXISTING houses FIRST.** Houses created
+   before this change have a `codigo` field but no `codigos/{CODE}` lookup doc,
+   so once the new rules ship, `entrarNaCasa`'s `get codigos/{CODE}` returns
+   null for them and **join-by-code breaks for every existing house** (members
+   stay in; invites break). Before the rules deploy, create
+   `codigos/{codigo} = {casaId, nome}` for every existing house — manually in
+   the console for a pilot's handful of houses, or via the idempotent
+   `scripts/backfill/` script if there are too many (that script needs a
+   service-account key — a credential Domo otherwise lacks; trade-off named in
+   `docs/DEPLOY.md`'s "Backfill"). Gate order: **backup → backfill → deploy
+   rules + client → smoke test.** `scripts/deploy.sh` step 3 blocks the rules
+   deploy until the backfill is confirmed.
+4. **Keep the previous ruleset id.** `firebase deploy` prints/stores it; rules
    roll back with `firebase deploy` of the prior `firestore.rules`. Rules are
    versioned in git here, so the rollback artifact is just the previous commit.
-4. Deploy is gated behind the `security` review in this cycle — do not deploy
+5. Deploy is gated behind the `security` review in this cycle — do not deploy
    until that sign-off exists.
 
 ## Current state of rules found in production (as of this change)

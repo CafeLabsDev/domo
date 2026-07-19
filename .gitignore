@@ -53,3 +53,11 @@ firestore-debug.log
 firebase-debug.log
 ui-debug.log
 *-debug.log
+
+# Service-account keys — NEVER commit a credential (compromised forever once in
+# git history). The codigos backfill reads its key path from an env var at
+# runtime; the key file must stay out of the repo. See scripts/backfill/.
+*serviceAccount*.json
+*service-account*.json
+*.key.json
+serviceAccountKey.json

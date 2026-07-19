@@ -3,7 +3,7 @@
 #
 # Encodes the release gate from docs/BACKEND.md ("Deploy gate: BACKUP FIRST")
 # as a script with hard checkpoints, so a step can't be skipped by accident.
-# Mirrors the 6 steps documented in docs/DEPLOY.md's "Deploying" section:
+# Mirrors the 7 steps documented in docs/DEPLOY.md's "Deploying" section:
 #
 #   1. Human confirms production data was backed up (manual export/console
 #      copy — Spark has no scheduled Firestore backup). This is the only
@@ -12,12 +12,17 @@
 #      client co-changes for join-by-code (criarCasa/entrarNaCasa/
 #      deletarCasa — see docs/BACKEND.md's "Required client co-change") are
 #      included. Skipped entirely for a hosting-only change.
-#   3. flutter analyze + flutter test, then the rules emulator suite —
+#   3. If this deploy touches firestore.rules: human confirms the codigos
+#      backfill for PRE-EXISTING houses is done (manual console entry or
+#      scripts/backfill — see docs/DEPLOY.md's "Backfill"). Without it, the
+#      new rules make join-by-code fail for every house that predates this
+#      change. Skipped entirely for a hosting-only change.
+#   4. flutter analyze + flutter test, then the rules emulator suite —
 #      aborts the deploy if either fails.
-#   4. Final human confirmation showing exactly what will run.
-#   5. Deploy firestore.rules (only if step 2 said rules are part of this
+#   5. Final human confirmation showing exactly what will run.
+#   6. Deploy firestore.rules (only if step 2 said rules are part of this
 #      deploy).
-#   6. Build the web client and deploy hosting.
+#   7. Build the web client and deploy hosting.
 #
 # This script is meant to be run interactively, by hand, by whoever is doing
 # the release. It is NOT run by CI — CI (.github/workflows/ci.yml) only
@@ -25,8 +30,12 @@
 #
 # Requires:
 #   - `firebase` CLI on PATH, logged in (`firebase login`) with deploy access
-#     to domo-8b336. No service-account key needed — unlike Dindin, Domo has
-#     no Admin-SDK backfill script, so an interactive user login is enough.
+#     to domo-8b336. The deploy itself needs NO service-account key — an
+#     interactive user login is enough. (The OPTIONAL codigos backfill in
+#     scripts/backfill/ does need a service-account key, but only if you pick
+#     the script over the manual console path — see docs/DEPLOY.md "Backfill".
+#     The deploy gate below only asks whether the backfill was DONE, by either
+#     path; it does not run it.)
 #
 # Usage: scripts/deploy.sh
 #
@@ -62,7 +71,7 @@ cd "$REPO_ROOT"
 
 # --- 1. human backup gate ----------------------------------------------------
 
-log "Step 1/6 — manual data backup"
+log "Step 1/7 — manual data backup"
 echo "Spark has no scheduled Firestore backup. Before touching production, take"
 echo "a manual export (gcloud firestore export gs://<bucket> if a bucket is"
 echo "available, OR manually copy the current 'casas' docs from the Firebase"
@@ -72,7 +81,7 @@ confirm "Have you already backed up production data?" \
 
 # --- 2. rules co-change gate (only if this deploy touches firestore.rules) --
 
-log "Step 2/6 — firestore.rules / join-by-code co-change gate"
+log "Step 2/7 — firestore.rules / join-by-code co-change gate"
 RULES_CHANGED="no"
 if confirm "Does this deploy include a change to firestore.rules?"; then
   RULES_CHANGED="yes"
@@ -90,13 +99,34 @@ else
   log "No rules change in this deploy — skipping the co-change gate."
 fi
 
-# --- 3. tests: flutter analyze/test + rules emulator suite ------------------
+# --- 3. codigos backfill gate (only if this deploy touches firestore.rules) --
 
-log "Step 3/6 — flutter analyze + flutter test"
+log "Step 3/7 — codigos backfill gate (pre-existing houses)"
+if [ "$RULES_CHANGED" = "yes" ]; then
+  echo
+  echo "Houses created BEFORE this change have a 'codigo' field but NO"
+  echo "codigos/{CODE} lookup doc. Under the new rules, entrarNaCasa does"
+  echo "'get codigos/{CODE}' -> null for every such house, so NOBODY can join a"
+  echo "pre-existing house by code (existing members stay in; invites break)."
+  echo "Backfill codigos/{CODE} = {casaId, nome} for EVERY existing house FIRST,"
+  echo "by either path (docs/DEPLOY.md's 'Backfill'):"
+  echo "  - MANUAL (recommended for a pilot): create the docs by hand in the"
+  echo "    Firebase console. Zero code, zero new credential."
+  echo "  - SCRIPT (only if there are too many to hand-enter): scripts/backfill/"
+  echo "    (needs a service-account key — a credential Domo otherwise lacks)."
+  confirm "Is the codigos backfill DONE for every pre-existing house?" \
+    || die "Backfill not confirmed. Do it FIRST (manual console or scripts/backfill) — deploying rules now would break join-by-code for every existing house."
+else
+  log "No rules change in this deploy — skipping the backfill gate."
+fi
+
+# --- 4. tests: flutter analyze/test + rules emulator suite ------------------
+
+log "Step 4/7 — flutter analyze + flutter test"
 flutter analyze || die "flutter analyze failed. Fix the reported issues before deploying."
 flutter test || die "flutter test failed. Fix the failing tests before deploying."
 
-log "Step 3/6 — firestore rules test suite (emulator, never touches production)"
+log "Step 4/7 — firestore rules test suite (emulator, never touches production)"
 if [ ! -d "$REPO_ROOT/test/rules/node_modules" ]; then
   log "Installing test/rules dependencies..."
   (cd "$REPO_ROOT/test/rules" && npm install)
@@ -105,9 +135,9 @@ npx --yes firebase-tools emulators:exec --only firestore --project domo-rules-te
   "npm test --prefix test/rules" \
   || die "Rules test suite failed. Fix the failing rule(s) before deploying — production rules are unaffected so far."
 
-# --- 4. final confirmation ---------------------------------------------------
+# --- 5. final confirmation ---------------------------------------------------
 
-log "Step 4/6 — final confirmation"
+log "Step 5/7 — final confirmation"
 echo "About to, in order, against project '$PROJECT_ID':"
 if [ "$RULES_CHANGED" = "yes" ]; then
   echo "  a) firebase deploy --only firestore:rules --project $PROJECT_ID"
@@ -120,21 +150,21 @@ else
 fi
 confirm "Proceed?" || die "Cancelled by user."
 
-# --- 5. deploy rules (only if this deploy includes a rules change) ----------
+# --- 6. deploy rules (only if this deploy includes a rules change) ----------
 
 if [ "$RULES_CHANGED" = "yes" ]; then
-  log "Step 5/6 — deploying firestore.rules"
+  log "Step 6/7 — deploying firestore.rules"
   firebase deploy --only firestore:rules --project "$PROJECT_ID"
 else
-  log "Step 5/6 — skipped (no rules change in this deploy)"
+  log "Step 6/7 — skipped (no rules change in this deploy)"
 fi
 
-# --- 6. build + deploy hosting ------------------------------------------------
+# --- 7. build + deploy hosting ------------------------------------------------
 
-log "Step 6/6 — building web client"
+log "Step 7/7 — building web client"
 flutter build web
 
-log "Step 6/6 — deploying hosting"
+log "Step 7/7 — deploying hosting"
 firebase deploy --only hosting --project "$PROJECT_ID"
 
 log "Deploy complete."

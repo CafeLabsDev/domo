@@ -1,0 +1,14 @@
+{
+  "name": "domo-backfill-codigos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One-shot, idempotent migration that backfills codigos/{CODE} lookup docs for casas that predate the join-by-code lookup. Standalone Node harness, NOT part of the Flutter app's pubspec, and NOT part of test/rules. Requires the Admin SDK (a service-account key) — see scripts/backfill/README.md and docs/DEPLOY.md before running.",
+  "scripts": {
+    "backfill": "node backfill-codigos.mjs",
+    "backfill:commit": "node backfill-codigos.mjs --commit"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
