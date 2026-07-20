@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +13,8 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await AnalyticsService().init();
+  // Não aguarda nem propaga falha: analytics é opcional e não pode travar o boot do app.
+  unawaited(AnalyticsService().init().catchError((_) {}));
   runApp(const ProviderScope(child: DomoApp()));
 }
 
