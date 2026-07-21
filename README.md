@@ -23,9 +23,10 @@ App de gestão doméstica para famílias e grupos — Android e Web.
 | Backend | Firebase Auth + Cloud Firestore |
 | Auth social | `google_sign_in ^6.2.0` |
 | Modelos | `freezed ^3.0.0` + `json_serializable` |
+| Analytics | `firebase_analytics ^11.4.4` (4 eventos mínimos, sem PII — ver `docs/ARQUITETURA.md`) |
 | Imagens | `cached_network_image ^3.4.1` |
 | SVG | `flutter_svg ^2.0.10` |
-| Fonte | Google Fonts — Nunito |
+| Fonte | Google Fonts — Bitter (headings) + Manrope (corpo/UI), buscadas dinamicamente em runtime |
 
 ---
 
@@ -86,98 +87,47 @@ dart run flutter_launcher_icons
 ```
 
 Assets em `assets/icons/`:
-- `icon.png` — 1024×1024, fundo `#F8F5EF` (web + legacy Android)
+- `icon.png` — 1024×1024, fundo `#EEF1F1` (web + legacy Android, tom "ceramic stone" da identidade Armário Aberto)
 - `icon_foreground.png` — 1024×1024, fundo transparente (Android adaptive)
-- `domo_icon.svg` — logo SVG (AppBar + favicon web)
+- `domo_icon.svg` — logo SVG (AppBar + favicon web), já recolorido para a paleta Azul Louça (`docs/DESIGN.md` §5)
 
 ---
 
 ## Arquitetura
 
-**Feature-first + Clean Architecture** — cada feature possui suas próprias camadas de `data`, `domain` e `presentation`.
+**Feature-first + Clean Architecture** — cada feature em `lib/features/` tem
+suas próprias camadas `data` / `domain` / `presentation`; estado via Riverpod
+(code-gen), navegação via `go_router`.
 
 ```
 lib/
-├── core/
-│   ├── constants/
-│   ├── providers/          # theme_provider.dart
-│   ├── router/             # app_router.dart (go_router)
-│   └── theme/              # app_colors, app_spacing, app_theme (light + dark)
-├── features/
-│   ├── auth/
-│   │   ├── data/repositories/
-│   │   ├── domain/repositories/
-│   │   └── presentation/pages/, providers/
-│   ├── casa/
-│   │   ├── data/repositories/
-│   │   ├── domain/models/, repositories/
-│   │   └── presentation/pages/, providers/
-│   ├── dispensa/
-│   │   ├── data/repositories/
-│   │   ├── domain/constants.dart, models/, repositories/
-│   │   └── presentation/pages/, providers/, widgets/
-│   ├── mercado/
-│   │   └── presentation/pages/
-│   └── profile/
-│       └── presentation/pages/
-└── shared/
-    └── widgets/            # home_shell.dart, domo_leading_logo.dart
+├── core/          # analytics, constants, providers (tema), router, theme
+├── features/      # auth, casa, dispensa, mercado, profile
+└── shared/        # widgets reutilizados entre features (HomeShell, DomoErrorState...)
 ```
+
+Aprofundamento (camadas, padrões de provider, roteamento, decisões técnicas):
+**`docs/ARQUITETURA.md`**.
 
 ---
 
-## Design System — Sage Home
+## Design e identidade visual
 
-| Token | Valor |
-|---|---|
-| Primary | `#4A7C59` Verde Sálvia |
-| Secondary | `#7D5BA6` Lavanda |
-| Tertiary | `#E8A87C` Pêssego |
-| Background Light | `#F8F5EF` Creme |
-| Background Dark | `#1A1C1E` |
-| Surface Light | `#FFFFFF` |
-| Surface Dark | `#2B2D30` |
-
-Material Design 3 com suporte nativo a Light e Dark mode via `AppTheme.light` / `AppTheme.dark`.
+Identidade **"Armário Aberto"** — paleta Azul Louça, tipografia Bitter
+(headings) + Manrope (corpo), Material Design 3 com suporte nativo a Light e
+Dark mode via `AppTheme.light` / `AppTheme.dark`. Tokens completos, contraste
+WCAG e rationale de cada decisão: **`docs/DESIGN.md`**.
 
 ---
 
-## Modelo de dados (Firestore)
+## Backend e dados
 
-```
-casas/{casaId}
-  nome, codigo, criadoPor, criadoEm, membrosAtivos[]
-  └── membros/{userId}   nome, cargo, fotoUrl, status
-  └── itens/{itemId}     nome, categoria, status, atualizadoEm, casaId
-```
-
-**Status de item:** `tem` | `nao_tem` | `no_carrinho`
+Firebase Auth + Cloud Firestore. Modelo de dados, regras de segurança e o
+fluxo de convite por código: **`docs/BACKEND.md`**.
 
 ---
 
-## Decisões técnicas
+## Deploy
 
-**Providers em sheets/dialogs** — providers com `@riverpod` são auto-dispose. Em `BottomSheet` ou `AlertDialog`, sempre usar `ref.read(repositoryProvider)` diretamente; nunca aguardar um `Future` que dependa de um provider que pode ser descartado enquanto o widget está aberto.
-
-**Botões em `AlertDialog`** — o tema global define `minimumSize: Size(double.infinity, 52)`, o que causa overflow no `OverflowBar`. Sempre sobrescrever em dialogs: `FilledButton.styleFrom(minimumSize: const Size(88, 44))`.
-
-**Cores de erro** — usar sempre `Theme.of(context).colorScheme.error` em elementos interativos (retorna `#BA1A1A` no light e `#FFB4AB` no dark automaticamente).
-
----
-
-## Roteamento
-
-```
-/auth/login          LoginPage
-/auth/register       RegisterPage
-/casa/gate           CasaGatePage
-/casa/criar          CriarCasaPage
-/casa/entrar         EntrarCasaPage
-StatefulShellRoute (NavigationBar)
-  /dispensa          DispensaPage
-  /mercado           MercadoPage
-  /casa              CasaPage
-  /perfil            ProfilePage
-```
-
-Redirect: não logado → `/auth/login` · logado sem casa → `/casa/gate` · logado com casa em `/auth/*` → `/dispensa`
+Firebase Hosting (`app.domo.cafelabs.net`), CI no GitHub Actions, deploy
+manual gated via `scripts/deploy.sh`: **`docs/DEPLOY.md`**.
