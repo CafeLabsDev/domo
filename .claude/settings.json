@@ -17,7 +17,10 @@
       "Bash(firebase login:list)",
       "Bash(firebase projects:list)",
       "Bash(flutter build *)",
-      "Bash(firebase deploy *)"
+      "Bash(firebase deploy *)",
+      "Bash(cd /home/felip/projetos/domo && ./scripts/deploy.sh*)",
+      "Bash(./scripts/deploy.sh*)",
+      "Bash(scripts/deploy.sh*)"
     ]
   }
 }
