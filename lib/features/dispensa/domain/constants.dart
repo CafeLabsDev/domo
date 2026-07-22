@@ -1,3 +1,9 @@
+import '../../../l10n/app_localizations.dart';
+
+// Fixed, Portuguese-only identifiers — these are the actual values stored in
+// Firestore (`item.categoria`, `casa.ordemCategorias`), not display copy.
+// Changing them would be a data migration, not a translation. Use
+// `categoriaLabel` below to get the localized text shown in the UI.
 const kDispensaCategorias = [
   'Frutas e Verduras',
   'Laticínios',
@@ -8,6 +14,23 @@ const kDispensaCategorias = [
   'Higiene e Cuidados',
   'Outros',
 ];
+
+/// Localized display label for a fixed category key. Falls back to the raw
+/// key itself for anything unrecognized (defensive, shouldn't happen since
+/// the key set is closed).
+String categoriaLabel(AppLocalizations l10n, String categoria) {
+  return switch (categoria) {
+    'Frutas e Verduras' => l10n.categoryFrutasVerduras,
+    'Laticínios' => l10n.categoryLaticinios,
+    'Carnes e Peixes' => l10n.categoryCarnesPeixes,
+    'Padaria' => l10n.categoryPadaria,
+    'Bebidas' => l10n.categoryBebidas,
+    'Limpeza' => l10n.categoryLimpeza,
+    'Higiene e Cuidados' => l10n.categoryHigieneCuidados,
+    'Outros' => l10n.categoryOutros,
+    _ => categoria,
+  };
+}
 
 /// Resolves the display order of the (fixed) dispensa categories for a house:
 /// the house's saved [ordemCategorias] when present, falling back to the

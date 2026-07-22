@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_spacing.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Friendly, actionable error state — replaces raw `Text('Erro: $e')`
 /// across the app (docs/DESIGN.md §4.7). Shows a warning icon, a
-/// situation-specific Portuguese title (never the raw exception string), a
-/// reassuring subtitle, and a "Tentar novamente" action that the caller
-/// wires to `ref.invalidate(...)` on the relevant provider.
+/// situation-specific localized title (never the raw exception string), a
+/// reassuring subtitle, and a retry action that the caller wires to
+/// `ref.invalidate(...)` on the relevant provider.
 class DomoErrorState extends StatelessWidget {
   const DomoErrorState({
     super.key,
     required this.title,
-    this.message =
-        'Verifique sua conexão com a internet e tente novamente.',
+    this.message,
     required this.onRetry,
   });
 
   final String title;
-  final String message;
+  final String? message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Center(
       child: Padding(
@@ -43,7 +44,7 @@ class DomoErrorState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              message,
+              message ?? l10n.genericLoadErrorMessage,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -53,7 +54,7 @@ class DomoErrorState extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tentar novamente'),
+              label: Text(l10n.retry),
             ),
           ],
         ),

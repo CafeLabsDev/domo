@@ -11,6 +11,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/membro_model.dart';
 import '../providers/casa_controller.dart';
 import '../providers/casa_provider.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../../shared/widgets/domo_leading_logo.dart' show DomoPageTitle;
 
@@ -18,29 +19,29 @@ class CasaPage extends ConsumerWidget {
   const CasaPage({super.key});
 
   void _copiarCodigo(BuildContext context, String codigo) {
+    final l10n = AppLocalizations.of(context)!;
     Clipboard.setData(ClipboardData(text: codigo));
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Código copiado!'),
+        SnackBar(
+          content: Text(l10n.codeCopied),
           behavior: SnackBarBehavior.floating,
         ),
       );
   }
 
   void _confirmarSaida(BuildContext context, WidgetRef ref, String casaId) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sair da casa'),
-        content: const Text(
-          'Você vai perder o acesso a esta casa. Para voltar, precisará do código de convite.',
-        ),
+        title: Text(l10n.leaveHouseTitle),
+        content: Text(l10n.leaveHouseConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -50,7 +51,7 @@ class CasaPage extends ConsumerWidget {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Sair'),
+            child: Text(l10n.leave),
           ),
         ],
       ),
@@ -81,6 +82,7 @@ class CasaPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final casaAsync = ref.watch(casaDoUsuarioProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return casaAsync.when(
       loading: () => const Scaffold(
@@ -88,7 +90,7 @@ class CasaPage extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         body: DomoErrorState(
-          title: 'Não foi possível carregar sua casa.',
+          title: l10n.couldNotLoadHouse,
           onRetry: () => ref.invalidate(casaDoUsuarioProvider),
         ),
       ),
@@ -110,7 +112,7 @@ class CasaPage extends ConsumerWidget {
             centerTitle: false,
             actions: [
               IconButton(
-                tooltip: 'Copiar código',
+                tooltip: l10n.copyCodeTooltip,
                 icon: const Icon(Icons.share_rounded),
                 onPressed: () => _copiarCodigo(context, casa.codigo),
               ),
@@ -119,7 +121,7 @@ class CasaPage extends ConsumerWidget {
               // rather than inside the sair/deletar popup menu since it's
               // not a destructive/admin-gated action.
               IconButton(
-                tooltip: 'Reordenar categorias',
+                tooltip: l10n.reorderCategoriesTooltip,
                 icon: const Icon(Icons.sort_rounded),
                 onPressed: () => context.push('/casa/categorias'),
               ),
@@ -133,11 +135,11 @@ class CasaPage extends ConsumerWidget {
                 },
                 itemBuilder: (_) => [
                   if (!isAdmin)
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: _MenuAcao.sair,
                       child: ListTile(
-                        leading: Icon(Icons.logout),
-                        title: Text('Sair da casa'),
+                        leading: const Icon(Icons.logout),
+                        title: Text(l10n.leaveHouseTitle),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
@@ -148,7 +150,7 @@ class CasaPage extends ConsumerWidget {
                         leading: Icon(Icons.delete_forever,
                             color: Theme.of(context).colorScheme.error),
                         title: Text(
-                          'Deletar casa',
+                          l10n.deleteHouseTitle,
                           style:
                               TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
@@ -183,7 +185,7 @@ class CasaPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Código de convite',
+                          l10n.inviteCode,
                           style: Theme.of(context)
                               .textTheme
                               .labelMedium
@@ -220,7 +222,7 @@ class CasaPage extends ConsumerWidget {
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (e, _) => DomoErrorState(
-                    title: 'Não foi possível carregar os membros da casa.',
+                    title: l10n.couldNotLoadMembers,
                     onRetry: () => ref.invalidate(membrosProvider(casa.id)),
                   ),
                   data: (membros) {
@@ -238,7 +240,7 @@ class CasaPage extends ConsumerWidget {
                       children: [
                         if (pendentes.isNotEmpty && isAdmin) ...[
                           _SectionHeader(
-                            'Aguardando aprovação (${pendentes.length})',
+                            l10n.pendingApproval(pendentes.length),
                           ),
                           ...pendentes.map(
                             (m) => _MembroTile(
@@ -251,7 +253,7 @@ class CasaPage extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.md),
                         ],
-                        _SectionHeader('Membros (${ativos.length})'),
+                        _SectionHeader(l10n.membersCount(ativos.length)),
                         ...ativos.map(
                           (m) => _MembroTile(
                             membro: m,
@@ -310,18 +312,16 @@ class _MembroTile extends ConsumerWidget {
   final bool isAdmin;
 
   void _confirmarRemocao(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover membro'),
-        content: Text(
-          'Deseja remover ${membro.nome} da casa? '
-          'Eles perderão o acesso imediatamente.',
-        ),
+        title: Text(l10n.removeMemberTitle),
+        content: Text(l10n.removeMemberConfirm(membro.nome)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -333,7 +333,7 @@ class _MembroTile extends ConsumerWidget {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Remover'),
+            child: Text(l10n.remove),
           ),
         ],
       ),
@@ -343,6 +343,7 @@ class _MembroTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final podeRemover = isAdmin &&
         !isPending &&
         membro.userId != currentUserId;
@@ -384,7 +385,7 @@ class _MembroTile extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Aprovar',
+                    tooltip: l10n.approveTooltip,
                     icon: const Icon(Icons.check_circle_rounded),
                     color: Theme.of(context).colorScheme.primary,
                     onPressed: () => ref
@@ -392,7 +393,7 @@ class _MembroTile extends ConsumerWidget {
                         .aprovarMembro(casaId, membro.userId),
                   ),
                   IconButton(
-                    tooltip: 'Recusar',
+                    tooltip: l10n.rejectTooltip,
                     icon: const Icon(Icons.cancel_rounded),
                     color: Theme.of(context).colorScheme.error,
                     onPressed: () => ref
@@ -403,7 +404,7 @@ class _MembroTile extends ConsumerWidget {
               )
             : podeRemover
                 ? IconButton(
-                    tooltip: 'Remover membro',
+                    tooltip: l10n.removeMemberTitle,
                     icon: const Icon(Icons.person_remove_outlined),
                     color: Theme.of(context).colorScheme.error,
                     onPressed: () => _confirmarRemocao(context, ref),
@@ -433,7 +434,7 @@ class _PendenteChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
       ),
       child: Text(
-        'Pendente',
+        AppLocalizations.of(context)!.pendingChip,
         style: theme.textTheme.labelMedium?.copyWith(color: inkSubtle),
       ),
     );
@@ -492,7 +493,7 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
       } on FirebaseAuthException {
         setState(() {
           _isLoading = false;
-          _erro = 'Senha incorreta. Verifique e tente novamente.';
+          _erro = AppLocalizations.of(context)!.wrongPasswordError;
         });
         return;
       }
@@ -505,26 +506,24 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return AlertDialog(
-      title: const Text('Deletar casa'),
+      title: Text(l10n.deleteHouseTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Esta ação é permanente e não pode ser desfeita. '
-              'Todos os membros perderão o acesso.',
-            ),
+            Text(l10n.deleteHouseConfirmBody),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _nomeController,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                labelText: 'Nome da casa',
+                labelText: l10n.houseNameLabel,
                 hintText: widget.nomeCasa,
-                helperText: 'Digite exatamente: ${widget.nomeCasa}',
+                helperText: l10n.houseNameHelper(widget.nomeCasa),
               ),
             ),
             if (!widget.isGoogleUser) ...[
@@ -534,8 +533,8 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
                 obscureText: true,
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _confirmar(),
-                decoration: const InputDecoration(
-                  labelText: 'Sua senha',
+                decoration: InputDecoration(
+                  labelText: l10n.yourPasswordLabel,
                 ),
               ),
             ],
@@ -555,7 +554,7 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text('Cancelar'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _podeConfirmar ? _confirmar : null,
@@ -573,7 +572,7 @@ class _ConfirmarDelecaoDialogState extends State<_ConfirmarDelecaoDialog> {
                     color: theme.colorScheme.onError,
                   ),
                 )
-              : const Text('Deletar'),
+              : Text(l10n.delete),
         ),
       ],
     );

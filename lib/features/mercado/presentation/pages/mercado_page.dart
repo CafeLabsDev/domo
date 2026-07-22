@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
 import '../../../dispensa/domain/constants.dart';
 import '../../../dispensa/domain/models/pantry_item.dart';
@@ -17,6 +18,7 @@ class MercadoPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final casaAsync = ref.watch(casaDoUsuarioProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return casaAsync.when(
       loading: () => const Scaffold(
@@ -24,7 +26,7 @@ class MercadoPage extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         body: DomoErrorState(
-          title: 'Não foi possível carregar sua casa.',
+          title: l10n.couldNotLoadHouse,
           onRetry: () => ref.invalidate(casaDoUsuarioProvider),
         ),
       ),
@@ -49,16 +51,17 @@ class _MercadoContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itensAsync = ref.watch(itensProvider(casaId));
     final controller = ref.read(dispensaControllerProvider.notifier);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: DomoPageTitle('Lista de Compras'),
+        title: DomoPageTitle(l10n.shoppingListTitle),
         centerTitle: false,
       ),
       body: itensAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => DomoErrorState(
-          title: 'Não foi possível carregar sua lista de compras.',
+          title: l10n.couldNotLoadShoppingList,
           onRetry: () => ref.invalidate(itensProvider(casaId)),
         ),
         data: (todos) {
@@ -135,6 +138,7 @@ class _ListaDeCompras extends StatelessWidget {
         .where(grouped.containsKey)
         .toList();
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       children: [
@@ -156,7 +160,7 @@ class _ListaDeCompras extends StatelessWidget {
                       AppSpacing.xs,
                     ),
                     child: Text(
-                      categoria.toUpperCase(),
+                      categoriaLabel(l10n, categoria).toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.primary,
                         letterSpacing: 1.2,
@@ -239,7 +243,7 @@ class _MercadoItemTile extends StatelessWidget {
             ),
             if (noCarrinho)
               Text(
-                'No carrinho',
+                AppLocalizations.of(context)!.inCartLabel,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: statusCarrinho,
                   fontWeight: FontWeight.w700,
@@ -294,10 +298,8 @@ class _RodapeBotao extends StatelessWidget {
         icon: const Icon(Icons.check_circle_outline),
         label: Text(
           habilitado
-              ? (quantidade == 1
-                  ? 'Atualizar dispensa (1 item)'
-                  : 'Atualizar dispensa ($quantidade itens)')
-              : 'Selecione itens para comprar',
+              ? AppLocalizations.of(context)!.updatePantryItems(quantidade)
+              : AppLocalizations.of(context)!.selectItemsToShop,
         ),
       ),
     );
@@ -310,6 +312,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -323,13 +326,13 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Nada para comprar',
+              l10n.shoppingEmptyTitle,
               style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Quando um item da dispensa estiver "Em falta", ele aparecerá aqui para você marcar na lista.',
+              l10n.shoppingEmptySubtitle,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),

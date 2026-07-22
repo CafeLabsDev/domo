@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/domo_error_state.dart';
 import '../../../dispensa/domain/constants.dart';
 import '../providers/casa_controller.dart';
@@ -19,13 +20,14 @@ class CategoriaOrdemPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final casaAsync = ref.watch(casaDoUsuarioProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ordem das categorias')),
+      appBar: AppBar(title: Text(l10n.categoryOrderTitle)),
       body: casaAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => DomoErrorState(
-          title: 'Não foi possível carregar sua casa.',
+          title: l10n.couldNotLoadHouse,
           onRetry: () => ref.invalidate(casaDoUsuarioProvider),
         ),
         data: (casa) {
@@ -78,12 +80,13 @@ class _CategoriaOrdemBodyState extends ConsumerState<_CategoriaOrdemBody> {
         .atualizarOrdemCategorias(widget.casaId, _ordem);
     if (!mounted) return;
     final erro = ref.read(casaControllerProvider).hasError;
+    final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
           content: Text(
-            erro ? 'Não foi possível salvar. Tente novamente.' : 'Ordem salva!',
+            erro ? l10n.saveOrderFailed : l10n.orderSaved,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -94,6 +97,7 @@ class _CategoriaOrdemBodyState extends ConsumerState<_CategoriaOrdemBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isLoading = ref.watch(casaControllerProvider).isLoading;
 
     return Column(
@@ -106,8 +110,7 @@ class _CategoriaOrdemBodyState extends ConsumerState<_CategoriaOrdemBody> {
             AppSpacing.sm,
           ),
           child: Text(
-            'Arraste para escolher a ordem em que as categorias aparecem na '
-            'Dispensa e na Lista de Compras.',
+            l10n.categoryOrderInstructions,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -125,7 +128,7 @@ class _CategoriaOrdemBodyState extends ConsumerState<_CategoriaOrdemBody> {
                 key: ValueKey(categoria),
                 margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: ListTile(
-                  title: Text(categoria),
+                  title: Text(categoriaLabel(l10n, categoria)),
                   trailing: ReorderableDragStartListener(
                     index: index,
                     child: const Icon(Icons.drag_handle_rounded),
@@ -153,7 +156,7 @@ class _CategoriaOrdemBodyState extends ConsumerState<_CategoriaOrdemBody> {
                       color: theme.colorScheme.onPrimary,
                     ),
                   )
-                : const Text('Salvar ordem'),
+                : Text(l10n.saveOrderButton),
           ),
         ),
       ],

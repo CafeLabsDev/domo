@@ -3,8 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/dispensa_controller.dart';
+
+String _statusLabel(AppLocalizations l10n, ItemStatus status) => switch (status) {
+      ItemStatus.tem => l10n.statusHave,
+      ItemStatus.naoTem => l10n.statusMissing,
+      ItemStatus.noCarrinho => l10n.inCartLabel,
+    };
 
 class PantryItemCard extends ConsumerWidget {
   const PantryItemCard({
@@ -33,26 +40,29 @@ class PantryItemCard extends ConsumerWidget {
         color: theme.colorScheme.error,
         child: Icon(Icons.delete_outline, color: theme.colorScheme.onError),
       ),
-      confirmDismiss: (_) => showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Remover item'),
-          content: Text('Deseja remover "${item.nome}" da dispensa?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(ctx).colorScheme.error,
+      confirmDismiss: (_) {
+        final l10n = AppLocalizations.of(context)!;
+        return showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.removeItemTitle),
+            content: Text(l10n.removeItemConfirm(item.nome)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.cancel),
               ),
-              child: const Text('Remover'),
-            ),
-          ],
-        ),
-      ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(ctx).colorScheme.error,
+                ),
+                child: Text(l10n.remove),
+              ),
+            ],
+          ),
+        );
+      },
       onDismissed: (_) => onDismiss(),
       // Two independent tap zones side by side, not one big InkWell with a
       // tiny GestureDetector nested inside it — the old layout made the
@@ -242,7 +252,7 @@ class _QuantityZone extends ConsumerWidget {
                   ],
                 ),
                 Text(
-                  'mín $estoqueMinimo',
+                  AppLocalizations.of(context)!.minStockPrefix(estoqueMinimo),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: textColor.withValues(alpha: 0.85),
                   ),
@@ -342,7 +352,7 @@ class _StatusToggleZone extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
             child: Center(
               child: Text(
-                status.label,
+                _statusLabel(AppLocalizations.of(context)!, status),
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: textColor,
                   letterSpacing: 0.2,

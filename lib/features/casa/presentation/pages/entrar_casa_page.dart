@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../providers/casa_controller.dart';
 
 class EntrarCasaPage extends ConsumerStatefulWidget {
@@ -33,6 +34,7 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
   Widget build(BuildContext context) {
     final isLoading = ref.watch(casaControllerProvider).isLoading;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     ref.listen(casaControllerProvider, (_, state) {
       if (state.hasError) {
@@ -48,8 +50,8 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(
-            const SnackBar(
-              content: Text('Solicitação enviada! Aguarde a aprovação.'),
+            SnackBar(
+              content: Text(l10n.joinRequestSent),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -58,7 +60,7 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Entrar em uma Casa'),
+        title: Text(l10n.joinHouseTitle),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -74,7 +76,7 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
                   children: [
                     const SizedBox(height: AppSpacing.md),
                     Text(
-                      'Digite o código de 6 caracteres compartilhado pelo administrador da casa.',
+                      l10n.joinHouseInstructions,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -97,17 +99,17 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                       textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        labelText: 'Código de convite',
-                        hintText: 'ABC123',
-                        prefixIcon: Icon(Icons.vpn_key_rounded),
+                      decoration: InputDecoration(
+                        labelText: l10n.inviteCode,
+                        hintText: l10n.inviteCodeHint,
+                        prefixIcon: const Icon(Icons.vpn_key_rounded),
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Informe o código.';
+                          return l10n.inviteCodeRequired;
                         }
                         if (v.trim().length != 6) {
-                          return 'O código deve ter 6 caracteres.';
+                          return l10n.inviteCodeWrongLength;
                         }
                         return null;
                       },
@@ -124,7 +126,7 @@ class _EntrarCasaPageState extends ConsumerState<EntrarCasaPage> {
                                 color: theme.colorScheme.onPrimary,
                               ),
                             )
-                          : const Text('Solicitar Entrada'),
+                          : Text(l10n.requestJoinButton),
                     ),
                   ],
                 ),

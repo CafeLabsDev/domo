@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/constants.dart';
 import '../../domain/models/pantry_item.dart';
@@ -83,10 +84,11 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
     final nome = _nomeController.text.trim();
     if (nome.isEmpty) {
       setState(() {
-        _nomeError = 'Digite um nome para o item.';
+        _nomeError = l10n.itemNameRequired;
         _saveError = null;
       });
       return;
@@ -102,8 +104,7 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
           estoqueMinimo == null ||
           estoqueMinimo < 0) {
         setState(() {
-          _quantidadeError =
-              'Informe quantidade e estoque mínimo (0 ou mais).';
+          _quantidadeError = l10n.quantityValidationError;
           _saveError = null;
         });
         return;
@@ -174,7 +175,7 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _saveError = 'Não foi possível salvar. Tente novamente.';
+          _saveError = l10n.saveItemFailed;
         });
       }
     }
@@ -183,6 +184,7 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -198,7 +200,7 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
           Row(
             children: [
               Text(
-                _isEditing ? 'Editar item' : 'Novo item',
+                _isEditing ? l10n.editItemTitle : l10n.newItemTitle,
                 style: theme.textTheme.titleLarge,
               ),
               const Spacer(),
@@ -217,8 +219,8 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
               if (_nomeError != null) setState(() => _nomeError = null);
             },
             decoration: InputDecoration(
-              labelText: 'Nome do item',
-              hintText: 'Ex: Leite integral',
+              labelText: l10n.itemNameLabel,
+              hintText: l10n.itemNameHint,
               errorText: _nomeError,
             ),
             onSubmitted: (_) => _save(),
@@ -226,13 +228,13 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
           const SizedBox(height: AppSpacing.md),
           DropdownMenu<String>(
             initialSelection: _categoria,
-            label: const Text('Categoria'),
+            label: Text(l10n.categoryLabel),
             expandedInsets: EdgeInsets.zero,
             onSelected: (v) {
               if (v != null) setState(() => _categoria = v);
             },
             dropdownMenuEntries: kDispensaCategorias
-                .map((c) => DropdownMenuEntry(value: c, label: c))
+                .map((c) => DropdownMenuEntry(value: c, label: categoriaLabel(l10n, c)))
                 .toList(),
           ),
           // Quantity/minimum-stock control is opt-in and only makes sense for
@@ -243,10 +245,8 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
             const SizedBox(height: AppSpacing.sm),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Controlar quantidade'),
-              subtitle: const Text(
-                'Acompanhe a quantidade e um estoque mínimo deste item.',
-              ),
+              title: Text(l10n.controlQuantitySwitch),
+              subtitle: Text(l10n.controlQuantityDescription),
               value: _controlaEstoque,
               onChanged: _onControlaEstoqueChanged,
             ),
@@ -263,8 +263,8 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
                           setState(() => _quantidadeError = null);
                         }
                       },
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade',
+                      decoration: InputDecoration(
+                        labelText: l10n.quantityLabel,
                       ),
                     ),
                   ),
@@ -278,8 +278,8 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
                           setState(() => _quantidadeError = null);
                         }
                       },
-                      decoration: const InputDecoration(
-                        labelText: 'Estoque mínimo',
+                      decoration: InputDecoration(
+                        labelText: l10n.minStockLabel,
                       ),
                     ),
                   ),
@@ -317,7 +317,7 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
                       color: theme.colorScheme.onPrimary,
                     ),
                   )
-                : Text(_isEditing ? 'Salvar' : 'Adicionar'),
+                : Text(_isEditing ? l10n.save : l10n.add),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../casa/domain/models/casa_model.dart';
@@ -30,7 +31,7 @@ class ProfilePage extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         body: DomoErrorState(
-          title: 'Não foi possível carregar sua casa.',
+          title: AppLocalizations.of(context)!.couldNotLoadHouse,
           onRetry: () => ref.invalidate(casaDoUsuarioProvider),
         ),
       ),
@@ -53,15 +54,16 @@ class _ProfileContent extends ConsumerWidget {
   }
 
   void _confirmarSaida(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sair'),
-        content: const Text('Tem certeza que deseja sair da sua conta?'),
+        title: Text(l10n.signOutConfirmTitle),
+        content: Text(l10n.signOutConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -71,7 +73,7 @@ class _ProfileContent extends ConsumerWidget {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Sair'),
+            child: Text(l10n.signOut),
           ),
         ],
       ),
@@ -81,6 +83,7 @@ class _ProfileContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     final membros = casa != null
         ? ref.watch(membrosProvider(casa!.id)).valueOrNull ?? []
@@ -90,7 +93,7 @@ class _ProfileContent extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: DomoPageTitle('Perfil'),
+        title: DomoPageTitle(l10n.profileTitle),
         centerTitle: false,
       ),
       body: SingleChildScrollView(
@@ -111,7 +114,7 @@ class _ProfileContent extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    user.displayName ?? 'Usuário',
+                    user.displayName ?? l10n.defaultUserName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -131,18 +134,18 @@ class _ProfileContent extends ConsumerWidget {
             ),
 
             if (casa != null) ...[
-              _SectionLabel('Na casa', theme),
+              _SectionLabel(l10n.inHouseSection, theme),
               _CardSection(
                 children: [
                   _InfoTile(
                     icon: Icons.home_outlined,
-                    label: 'Nome da casa',
+                    label: l10n.houseNameField,
                     value: casa!.nome,
                   ),
                   const Divider(height: 1, indent: 56),
                   _InfoTile(
                     icon: Icons.badge_outlined,
-                    label: 'Cargo',
+                    label: l10n.roleField,
                     value: meuMembro?.cargo.isNotEmpty == true
                         ? meuMembro!.cargo
                         : '—',
@@ -152,7 +155,7 @@ class _ProfileContent extends ConsumerWidget {
               const SizedBox(height: AppSpacing.md),
             ],
 
-            _SectionLabel('Aparência', theme),
+            _SectionLabel(l10n.appearanceSection, theme),
             _CardSection(
               children: [
                 Padding(
@@ -161,21 +164,21 @@ class _ProfileContent extends ConsumerWidget {
                     vertical: AppSpacing.md,
                   ),
                   child: SegmentedButton<ThemeMode>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        icon: Icon(Icons.brightness_auto_outlined),
-                        label: Text('Sistema'),
+                        icon: const Icon(Icons.brightness_auto_outlined),
+                        label: Text(l10n.systemTheme),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
-                        icon: Icon(Icons.light_mode_outlined),
-                        label: Text('Claro'),
+                        icon: const Icon(Icons.light_mode_outlined),
+                        label: Text(l10n.lightTheme),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        icon: Icon(Icons.dark_mode_outlined),
-                        label: Text('Escuro'),
+                        icon: const Icon(Icons.dark_mode_outlined),
+                        label: Text(l10n.darkTheme),
                       ),
                     ],
                     selected: {ref.watch(themeModeProvider)},
@@ -188,13 +191,13 @@ class _ProfileContent extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
 
-            _SectionLabel('Conta', theme),
+            _SectionLabel(l10n.accountSection, theme),
             _CardSection(
               children: [
                 ListTile(
                   leading: Icon(Icons.logout, color: theme.colorScheme.error),
                   title: Text(
-                    'Sair',
+                    l10n.signOut,
                     style: TextStyle(color: theme.colorScheme.error),
                   ),
                   onTap: () => _confirmarSaida(context, ref),
@@ -204,7 +207,7 @@ class _ProfileContent extends ConsumerWidget {
 
             const SizedBox(height: AppSpacing.xl),
             Text(
-              'Domo — um produto Café Labs',
+              l10n.footerBrand,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.brightness == Brightness.dark
                     ? AppColors.inkSubtleDark

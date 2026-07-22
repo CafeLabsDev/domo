@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class CasaGatePage extends StatelessWidget {
   const CasaGatePage({super.key});
@@ -9,6 +10,7 @@ class CasaGatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: SafeArea(
@@ -28,7 +30,7 @@ class CasaGatePage extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
-                    'Sua casa te espera!',
+                    l10n.casaGateTitle,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -36,7 +38,7 @@ class CasaGatePage extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Crie uma nova casa ou entre em uma existente usando o código do convite.',
+                    l10n.casaGateSubtitle,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -46,13 +48,13 @@ class CasaGatePage extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: () => context.push('/casa/criar'),
                     icon: const Icon(Icons.add_home_rounded),
-                    label: const Text('Criar uma Casa'),
+                    label: Text(l10n.createHouseButton),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   OutlinedButton.icon(
                     onPressed: () => context.push('/casa/entrar'),
                     icon: const Icon(Icons.vpn_key_rounded),
-                    label: const Text('Tenho um código de convite'),
+                    label: Text(l10n.haveInviteCodeButton),
                   ),
                 ],
               ),

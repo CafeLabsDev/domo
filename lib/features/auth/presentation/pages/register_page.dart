@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../providers/auth_controller.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
@@ -29,17 +30,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     super.dispose();
   }
 
-  String _errorMessage(Object? error) {
+  String _errorMessage(BuildContext context, Object? error) {
+    final l10n = AppLocalizations.of(context)!;
     if (error is FirebaseAuthException) {
       return switch (error.code) {
-        'email-already-in-use' => 'Este e-mail já está em uso.',
-        'invalid-email' => 'E-mail inválido.',
-        'weak-password' => 'A senha deve ter pelo menos 6 caracteres.',
-        'network-request-failed' => 'Sem conexão. Verifique sua internet.',
-        _ => 'Erro ao criar conta. Tente novamente.',
+        'email-already-in-use' => l10n.registerErrorEmailInUse,
+        'invalid-email' => l10n.emailInvalid,
+        'weak-password' => l10n.passwordTooShort,
+        'network-request-failed' => l10n.errorNetwork,
+        _ => l10n.registerErrorGeneric,
       };
     }
-    return 'Erro inesperado. Tente novamente.';
+    return l10n.errorUnexpected;
   }
 
   Future<void> _register() async {
@@ -54,6 +56,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
+    final l10n = AppLocalizations.of(context)!;
 
     ref.listen(authControllerProvider, (_, state) {
       if (state.hasError) {
@@ -61,7 +64,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
-              content: Text(_errorMessage(state.error)),
+              content: Text(_errorMessage(context, state.error)),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -73,7 +76,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.go('/auth/login')),
-        title: const Text('Criar Conta'),
+        title: Text(l10n.registerTitle),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -91,7 +94,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Preencha os dados abaixo\npara começar.',
+                      l10n.registerIntro,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -103,15 +106,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        prefixIcon: Icon(Icons.email_outlined),
+                      decoration: InputDecoration(
+                        labelText: l10n.emailLabel,
+                        prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Informe seu e-mail.';
+                          return l10n.emailRequired;
                         }
-                        if (!v.contains('@')) return 'E-mail inválido.';
+                        if (!v.contains('@')) return l10n.emailInvalid;
                         return null;
                       },
                     ),
@@ -123,7 +126,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
-                        labelText: 'Senha',
+                        labelText: l10n.passwordLabel,
                         prefixIcon: const Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -137,9 +140,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         ),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Informe uma senha.';
+                        if (v == null || v.isEmpty) return l10n.passwordRequiredRegister;
                         if (v.length < 6) {
-                          return 'A senha deve ter pelo menos 6 caracteres.';
+                          return l10n.passwordTooShort;
                         }
                         return null;
                       },
@@ -153,7 +156,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _register(),
                       decoration: InputDecoration(
-                        labelText: 'Confirmar senha',
+                        labelText: l10n.confirmPasswordLabel,
                         prefixIcon: const Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -168,10 +171,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Confirme sua senha.';
+                          return l10n.confirmPasswordRequired;
                         }
                         if (v != _passwordController.text) {
-                          return 'As senhas não coincidem.';
+                          return l10n.passwordsDontMatch;
                         }
                         return null;
                       },
@@ -190,7 +193,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                 color: theme.colorScheme.onPrimary,
                               ),
                             )
-                          : const Text('Criar Conta'),
+                          : Text(l10n.registerTitle),
                     ),
                     const SizedBox(height: AppSpacing.lg),
 
@@ -199,13 +202,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Já tem conta? ',
+                          l10n.haveAccountPrompt,
                           style: theme.textTheme.bodyMedium,
                         ),
                         GestureDetector(
                           onTap: () => context.go('/auth/login'),
                           child: Text(
-                            'Entrar',
+                            l10n.loginButton,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w700,

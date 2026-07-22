@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../providers/casa_controller.dart';
 
 class CriarCasaPage extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(casaControllerProvider).isLoading;
+    final l10n = AppLocalizations.of(context)!;
 
     ref.listen(casaControllerProvider, (_, state) {
       if (state.hasError) {
@@ -47,7 +49,7 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nova Casa'),
+        title: Text(l10n.newHouseTitle),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -63,7 +65,7 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
                   children: [
                     const SizedBox(height: AppSpacing.md),
                     Text(
-                      'Como sua casa se chama?',
+                      l10n.houseNameQuestion,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: Theme.of(context)
                                 .colorScheme
@@ -76,17 +78,17 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _criar(),
-                      decoration: const InputDecoration(
-                        labelText: 'Nome da casa',
-                        prefixIcon: Icon(Icons.home_rounded),
-                        hintText: 'Ex: Família Silva',
+                      decoration: InputDecoration(
+                        labelText: l10n.houseNameLabel,
+                        prefixIcon: const Icon(Icons.home_rounded),
+                        hintText: l10n.houseNameHint,
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Informe o nome da casa.';
+                          return l10n.houseNameRequired;
                         }
                         if (v.trim().length < 3) {
-                          return 'O nome deve ter pelo menos 3 caracteres.';
+                          return l10n.houseNameTooShort;
                         }
                         return null;
                       },
@@ -103,7 +105,7 @@ class _CriarCasaPageState extends ConsumerState<CriarCasaPage> {
                                 color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
-                          : const Text('Criar Casa'),
+                          : Text(l10n.createHouseSubmit),
                     ),
                   ],
                 ),

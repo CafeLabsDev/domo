@@ -10,12 +10,6 @@ enum ItemStatus {
   naoTem,
   noCarrinho;
 
-  String get label => switch (this) {
-        tem => 'Temos',
-        naoTem => 'Falta',
-        noCarrinho => 'No carrinho',
-      };
-
   ItemStatus get next => switch (this) {
         tem => naoTem,
         naoTem => noCarrinho,

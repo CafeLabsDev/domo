@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
 import '../../domain/constants.dart';
 import '../../domain/models/pantry_item.dart';
@@ -18,6 +19,7 @@ class DispensaPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final casaAsync = ref.watch(casaDoUsuarioProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return casaAsync.when(
       loading: () => const Scaffold(
@@ -25,7 +27,7 @@ class DispensaPage extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         body: DomoErrorState(
-          title: 'Não foi possível carregar sua casa.',
+          title: l10n.couldNotLoadHouse,
           onRetry: () => ref.invalidate(casaDoUsuarioProvider),
         ),
       ),
@@ -61,10 +63,11 @@ class _DispensaContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itensAsync = ref.watch(itensProvider(casaId));
     final controller = ref.read(dispensaControllerProvider.notifier);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: DomoPageTitle('Dispensa'),
+        title: DomoPageTitle(l10n.pantryTitle),
         centerTitle: false,
       ),
       floatingActionButton: FloatingActionButton(
@@ -74,7 +77,7 @@ class _DispensaContent extends ConsumerWidget {
       body: itensAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => DomoErrorState(
-          title: 'Não foi possível carregar sua dispensa.',
+          title: l10n.couldNotLoadPantry,
           onRetry: () => ref.invalidate(itensProvider(casaId)),
         ),
         data: (todos) {
@@ -129,6 +132,7 @@ class _ItensGrouped extends StatelessWidget {
         .where(grouped.containsKey)
         .toList();
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return ListView.builder(
       itemCount: categories.length,
@@ -147,7 +151,7 @@ class _ItensGrouped extends StatelessWidget {
                 AppSpacing.xs,
               ),
               child: Text(
-                categoria.toUpperCase(),
+                categoriaLabel(l10n, categoria).toUpperCase(),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.primary,
                   letterSpacing: 1.2,
@@ -178,6 +182,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -191,13 +196,13 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Sua dispensa está vazia',
+              l10n.pantryEmptyTitle,
               style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Adicione itens para controlar o que você tem em casa.',
+              l10n.pantryEmptySubtitle,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
@@ -207,7 +212,7 @@ class _EmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onAdd,
               icon: const Icon(Icons.add),
-              label: const Text('Adicionar item'),
+              label: Text(l10n.addItemButton),
             ),
           ],
         ),

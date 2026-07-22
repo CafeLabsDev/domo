@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../providers/auth_controller.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -27,19 +28,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
-  String _errorMessage(Object? error) {
+  String _errorMessage(BuildContext context, Object? error) {
+    final l10n = AppLocalizations.of(context)!;
     if (error is FirebaseAuthException) {
       return switch (error.code) {
         'user-not-found' || 'wrong-password' || 'invalid-credential' =>
-          'E-mail ou senha incorretos.',
-        'invalid-email' => 'E-mail inválido.',
-        'too-many-requests' => 'Muitas tentativas. Tente mais tarde.',
-        'network-request-failed' => 'Sem conexão. Verifique sua internet.',
-        'user-disabled' => 'Esta conta foi desativada.',
-        _ => 'Erro ao entrar. Tente novamente.',
+          l10n.loginErrorInvalidCredential,
+        'invalid-email' => l10n.emailInvalid,
+        'too-many-requests' => l10n.loginErrorTooManyRequests,
+        'network-request-failed' => l10n.errorNetwork,
+        'user-disabled' => l10n.loginErrorUserDisabled,
+        _ => l10n.loginErrorGeneric,
       };
     }
-    return 'Erro inesperado. Tente novamente.';
+    return l10n.errorUnexpected;
   }
 
   Future<void> _signIn() async {
@@ -58,6 +60,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
+    final l10n = AppLocalizations.of(context)!;
 
     ref.listen(authControllerProvider, (_, state) {
       if (state.hasError) {
@@ -65,7 +68,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
-              content: Text(_errorMessage(state.error)),
+              content: Text(_errorMessage(context, state.error)),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -98,7 +101,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                     // Título
                     Text(
-                      'Bem-vindo ao Domo',
+                      l10n.loginTitle,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -106,7 +109,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Gerencie sua casa com sua família.',
+                      l10n.loginSubtitle,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -119,15 +122,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        prefixIcon: Icon(Icons.email_outlined),
+                      decoration: InputDecoration(
+                        labelText: l10n.emailLabel,
+                        prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Informe seu e-mail.';
+                          return l10n.emailRequired;
                         }
-                        if (!v.contains('@')) return 'E-mail inválido.';
+                        if (!v.contains('@')) return l10n.emailInvalid;
                         return null;
                       },
                     ),
@@ -140,7 +143,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _signIn(),
                       decoration: InputDecoration(
-                        labelText: 'Senha',
+                        labelText: l10n.passwordLabel,
                         prefixIcon: const Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -154,7 +157,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Informe sua senha.';
+                        if (v == null || v.isEmpty) return l10n.passwordRequiredLogin;
                         return null;
                       },
                     ),
@@ -172,7 +175,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 color: theme.colorScheme.onPrimary,
                               ),
                             )
-                          : const Text('Entrar'),
+                          : Text(l10n.loginButton),
                     ),
                     const SizedBox(height: AppSpacing.md),
 
@@ -185,7 +188,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             horizontal: AppSpacing.md,
                           ),
                           child: Text(
-                            'ou',
+                            l10n.orDivider,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -200,7 +203,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     OutlinedButton.icon(
                       onPressed: isLoading ? null : _signInWithGoogle,
                       icon: const _GoogleIcon(),
-                      label: const Text('Continuar com Google'),
+                      label: Text(l10n.googleButton),
                     ),
                     const SizedBox(height: AppSpacing.xl),
 
@@ -209,13 +212,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Não tem conta? ',
+                          l10n.noAccountPrompt,
                           style: theme.textTheme.bodyMedium,
                         ),
                         GestureDetector(
                           onTap: () => context.go('/auth/register'),
                           child: Text(
-                            'Criar conta',
+                            l10n.createAccountLink,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w700,
