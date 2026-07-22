@@ -44,6 +44,18 @@ reviewed action. Before running any `firebase deploy --only firestore:rules`:
 5. Deploy is gated behind the `security` review in this cycle — do not deploy
    until that sign-off exists.
 
+**Note on this cycle's additions (item quantity control + category order):**
+both land in the SAME `firestore.rules` file as the `codigos` join-by-code
+change above, so the same gate/checkpoints apply — but unlike `codigos`, they
+need **no backfill** (step 3 above). Both new fields
+(`controlaEstoque`/`quantidade`/`estoqueMinimo`/`noCarrinho` on items,
+`ordemCategorias` on the house) are optional and treated as legally absent by
+the rules — every pre-existing document is valid as-is with the new rules,
+no pre-deploy data migration required. Do not conflate the two: `codigos`
+needed a backfill because the OLD join flow becomes unusable without it; these
+two features don't change any existing flow's behavior, they only add new
+opt-in ones.
+
 ## Current state of rules found in production (as of this change)
 
 **Could not read the live published ruleset** from this environment: the
@@ -86,8 +98,9 @@ management boundary in the rules is **ownership (`criadoPor`), not `cargo`.**
 | `casas/{id}` update — join | a non-member adds ONLY themselves as `pendente`; cannot self-approve, cannot enter `membrosAtivos`, cannot touch others or house metadata |
 | `casas/{id}` update — manage | the **owner** only: approve (`pendente`→`ativo` + `membrosAtivos`), remove/refuse, edit `cargo`, rename. `criadoPor`/`criadoEm`/`codigo` immutable |
 | `casas/{id}` update — leave | a member removes ONLY themselves (map + `membrosAtivos`) |
+| `casas/{id}` update — category order | any **ativo** member sets ONLY `ordemCategorias` (see "Per-house category order" below) |
 | `casas/{id}` delete | owner only |
-| `casas/{id}/itens/{itemId}` read/write | **ativo** members only (pendente excluded); status must be `tem`/`nao_tem`/`no_carrinho` |
+| `casas/{id}/itens/{itemId}` read/write | **ativo** members only (pendente excluded); write validated by `itemWriteValid()` — status must be `tem`/`nao_tem`/`no_carrinho`, plus the quantity-control invariants (see "Optional item quantity control" below) |
 | `codigos/{CODE}` get | any signed-in user who knows the code |
 | `codigos/{CODE}` list | denied (no enumeration) |
 
@@ -98,6 +111,80 @@ carries both the embedded `membros` map and the denormalized `membrosAtivos`
 list. No composite indexes are needed (all queries are single-field:
 `membrosAtivos array-contains`, `codigo ==`, `itens orderBy nome`), hence the
 empty `firestore.indexes.json`.
+
+Two fields added this cycle, both **optional and purely additive** — no schema
+migration, no backfill, existing docs are valid as-is because absence is a
+legal value for both:
+
+- `casas/{id}.ordemCategorias` (`List<String>?`) — see "Per-house category
+  order" below.
+- `casas/{casaId}/itens/{itemId}.controlaEstoque` / `.quantidade` /
+  `.estoqueMinimo` / `.noCarrinho` — see "Optional item quantity control"
+  below.
+
+## New in this cycle: optional item quantity control
+
+Per-item, opt-in stock control (`PantryItem.controlaEstoque`, default
+`false`). OFF-mode items (the default, and every pre-existing item — the
+field is simply absent on them) behave **exactly as before**: manual 3-value
+`status`, cart tracked by the `no_carrinho` status value. ON-mode items add:
+
+- `quantidade` / `estoqueMinimo` — non-negative ints.
+- `status` is **derived, not manual**: `quantidade <= estoqueMinimo` ⇒
+  `nao_tem`, else `tem`. The rules pin the stored value to that derivation
+  (`itemOnModeConsistent()` in `firestore.rules`) so the denormalization can
+  never drift — a client can't write an ON-mode item with a `status` that
+  disagrees with its own `quantidade`/`estoqueMinimo`.
+- `noCarrinho` (bool) carries "in the cart this trip" for ON-mode items
+  instead of the status enum (`no_carrinho` as a `status` value is rejected
+  for ON-mode items — `itemOnModeConsistent()` only allows `tem`/`nao_tem`).
+  OFF-mode items reject a stray `noCarrinho: true` (`itemOffModeConsistent()`)
+  so the two modes' cart signal never overlaps.
+
+`itemWriteValid()` (`firestore.rules`) is the single gate for both modes on
+every item `create`/`update`: validates types/ranges for the four new fields
+regardless of mode, then branches into the ON- or OFF-mode consistency check
+above. It composes with the existing `isActiveMemberOf(casaId)` check — same
+membership boundary as before, this only adds field-shape/consistency
+validation on top.
+
+## New in this cycle: per-house category order
+
+`casas/{id}.ordemCategorias` (`List<String>?`) — a per-house display order for
+the 8 hardcoded dispensa categories (`kDispensaCategorias` in
+`dispensa/domain/constants.dart`). This feature does **not** add category
+CRUD — the 8 categories themselves stay hardcoded in the client; only their
+*order* is stored per house. `null` (every pre-existing house) falls back to
+the hardcoded order client-side (`categoriasOrdenadas(...)`).
+
+Rules add a fourth `casas/{id}` update flow, `editOrdemCategorias()`: any
+**ativo** member (checked off the `membros` map, same source of truth as
+everywhere else in this file) may update the house doc **if and only if**
+`ordemCategorias` is the *only* key in the diff
+(`next().diff(prev()).affectedKeys().hasOnly(['ordemCategorias'])`) — so this
+path cannot be used to smuggle a change to `membros`, `membrosAtivos`,
+`criadoPor`/`criadoEm`/`codigo`, or anything else. The three pre-existing
+update flows (`joinAsPending`, `selfLeave`) were additionally hardened to
+explicitly reject touching `ordemCategorias` through *their* paths (a pendente
+joining, or anyone leaving, cannot also sneak in a category-order change in
+the same write) — closing a hole that would otherwise exist because Firestore
+rules `update` checks are evaluated as "does at least one flow's predicate
+match the whole diff," not per-field.
+
+Shape validation is intentionally shallow: `ordemCategorias is list` and
+`.size() <= 20`. Rules do **not** check that the list is exactly the 8 known
+category strings with no duplicates — that's deliberately left to the client,
+to avoid hardcoding the category name strings into `firestore.rules` (which
+would couple the rules file to a client-side constant list that can change
+without a rules deploy). `categoriasOrdenadas(...)` is defensive against a
+malformed/stale list anyway (drops unknown strings, appends any known category
+missing from it), so a rules bug or a manually-edited doc can't hide a
+category from the grouped views even without server-side dedup.
+
+Reached in the app via a dedicated `AppBar` icon on `CasaPage` (route
+`/casa/categorias`, `CategoriaOrdemPage`) — deliberately *not* inside the
+admin/destructive `PopupMenuButton`, since (unlike delete-casa/remove-member)
+this is available to any active member, not just the owner.
 
 ## Required client co-change: join-by-code (`codigos/{CODE}` lookup)
 
@@ -216,7 +303,7 @@ firebase emulators:exec --only firestore --project domo-rules-test \
 (`node` inside `emulators:exec` resolves to firebase's bundled pkg binary, which
 does NOT support `--test`; pass an absolute path to a real Node 20+ as above.)
 
-**50 tests, all passing.** Covers: non-member blocked, pendente limited (reads
+**77 tests, all passing.** Covers: non-member blocked, pendente limited (reads
 house, blocked from items), ativo member OK, owner-only approval/removal,
 self-join-as-pendente invariants (no self-approve, no `membrosAtivos` insert, no
 touching others, no two-key add, no deleting another's key), self-leave
@@ -227,6 +314,13 @@ rejection + update-denied, and unauthenticated writes denied on
 `casas`/`itens`/`codigos`. The self-leave griefing test is a regression guard:
 it passes only because of the three-line `next == prev \ {uid}` pin in
 `selfLeave()`; removing that pin makes it fail (verified).
+
+Also covers the optional item quantity control (ON-mode derived-status pinned
+to `quantidade <= estoqueMinimo`, non-negative-int validation, `no_carrinho`
+rejected as a derived status, OFF-mode unchanged incl. stray `noCarrinho:true`
+rejected) and per-house `ordemCategorias` (active-member-only edit, pendente/
+non-member denied, list-shape validated, and the join/manage/leave update flows
+proven intact and un-smuggleable through the new path).
 
 ## Cost note
 

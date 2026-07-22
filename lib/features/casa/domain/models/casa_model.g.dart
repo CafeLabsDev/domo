@@ -12,6 +12,9 @@ _CasaModel _$CasaModelFromJson(Map<String, dynamic> json) => _CasaModel(
   codigo: json['codigo'] as String,
   criadoPor: json['criadoPor'] as String,
   criadoEm: const TimestampConverter().fromJson(json['criadoEm']),
+  ordemCategorias: (json['ordemCategorias'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
 );
 
 Map<String, dynamic> _$CasaModelToJson(_CasaModel instance) =>
@@ -21,4 +24,5 @@ Map<String, dynamic> _$CasaModelToJson(_CasaModel instance) =>
       'codigo': instance.codigo,
       'criadoPor': instance.criadoPor,
       'criadoEm': const TimestampConverter().toJson(instance.criadoEm),
+      'ordemCategorias': instance.ordemCategorias,
     };

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -112,6 +113,15 @@ class CasaPage extends ConsumerWidget {
                 tooltip: 'Copiar código',
                 icon: const Icon(Icons.share_rounded),
                 onPressed: () => _copiarCodigo(context, casa.codigo),
+              ),
+              // Feature 3 — any active member (not admin-only) can reorder
+              // the dispensa categories for the house; kept as its own icon
+              // rather than inside the sair/deletar popup menu since it's
+              // not a destructive/admin-gated action.
+              IconButton(
+                tooltip: 'Reordenar categorias',
+                icon: const Icon(Icons.sort_rounded),
+                onPressed: () => context.push('/casa/categorias'),
               ),
               PopupMenuButton<_MenuAcao>(
                 onSelected: (acao) {

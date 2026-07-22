@@ -20,9 +20,23 @@ rules_version = '2';
 //                               It is NEVER trusted for authorization here
 //                               (a forged entry cannot grant read/write because
 //                               every check below reads the `membros` map).
+//     .ordemCategorias: list (optional) -> per-house display order of the
+//                               hardcoded dispensa categories. Any ACTIVE member
+//                               may edit it (see editOrdemCategorias). Absent =>
+//                               client falls back to the hardcoded order.
 //   casas/{casaId}/itens/{itemId}       pantry items, one subcollection per house
 //     .status: 'tem' | 'nao_tem' | 'no_carrinho', plus nome/categoria/
 //     atualizadoEm/atualizadoPor.
+//     Optional quantity control (opt-in, default off):
+//       .controlaEstoque: bool  -> when true, status is DERIVED from
+//                                  quantidade <= estoqueMinimo (=> nao_tem, else
+//                                  tem) and pinned to that value by the rules;
+//                                  the cart state moves to `noCarrinho`.
+//       .quantidade, .estoqueMinimo: non-neg ints (required when ON).
+//       .noCarrinho: bool  -> orthogonal "in the cart this trip" flag for
+//                             ON-mode items. OFF-mode items keep using the
+//                             `no_carrinho` status value, so noCarrinho stays
+//                             false for them.
 //   codigos/{CODE}                      join-code -> casaId lookup (see below).
 //
 // JOIN-BY-CODE — why `codigos/{CODE}` exists:
@@ -83,6 +97,51 @@ service cloud.firestore {
       return next().membros.diff(prev().membros).affectedKeys().hasOnly([uid()]);
     }
 
+    // ---- item field validation (dispensa) --------------------------------
+    // An item write may be OFF-mode (manual 3-value status, exactly as before)
+    // or ON-mode (quantity/minimum control). request.resource.data is the FULL
+    // post-write doc, so these read the merged result on updates too.
+
+    function itemHas(field) {
+      return field in next();
+    }
+    // Optional field: absent, or present with the expected shape.
+    function itemOptBool(field) {
+      return !itemHas(field) || next()[field] is bool;
+    }
+    function itemOptNonNegInt(field) {
+      return !itemHas(field) || (next()[field] is int && next()[field] >= 0);
+    }
+    // ON-mode iff controlaEstoque is explicitly the bool true.
+    function itemControlsStock() {
+      return itemHas('controlaEstoque') && next().controlaEstoque == true;
+    }
+    // ON-mode: quantidade/estoqueMinimo are required non-neg ints and the
+    // stored (denormalized) status MUST equal the derived value, so the
+    // denormalization can never drift. Short-circuit guards the int access
+    // before the comparison.
+    function itemOnModeConsistent() {
+      return next().quantidade is int && next().quantidade >= 0
+        && next().estoqueMinimo is int && next().estoqueMinimo >= 0
+        && next().status == (next().quantidade <= next().estoqueMinimo
+              ? 'nao_tem' : 'tem');
+    }
+    // OFF-mode: cart is carried by the status enum, so a stray noCarrinho:true
+    // is rejected (keeps OFF items behaving exactly as before).
+    function itemOffModeConsistent() {
+      return !itemHas('noCarrinho') || next().noCarrinho == false;
+    }
+    function itemWriteValid() {
+      return next().status in ['tem', 'nao_tem', 'no_carrinho']
+        && itemOptBool('controlaEstoque')
+        && itemOptBool('noCarrinho')
+        && itemOptNonNegInt('quantidade')
+        && itemOptNonNegInt('estoqueMinimo')
+        && (itemControlsStock()
+              ? itemOnModeConsistent()
+              : itemOffModeConsistent());
+    }
+
     // ---- casas ------------------------------------------------------------
 
     match /casas/{casaId} {
@@ -111,10 +170,11 @@ service cloud.firestore {
         && next().codigo is string
         && next().nome is string;
 
-      // UPDATE: exactly three legitimate flows, nothing else.
+      // UPDATE: exactly four legitimate flows, nothing else.
       allow update: if joinAsPending()
         || ownerManages()
-        || selfLeave();
+        || selfLeave()
+        || editOrdemCategorias();
 
       // DELETE: only the owner may delete the whole house.
       allow delete: if isOwnerOfCurrent();
@@ -131,7 +191,10 @@ service cloud.firestore {
           && unchanged('membrosAtivos')
           && onlyOwnMembroKeyChanged()
           && uid() in next().membros
-          && next().membros[uid()].status == 'pendente';
+          && next().membros[uid()].status == 'pendente'
+          // A joiner is not yet an ACTIVE member, so must not also edit the
+          // house-level category order in the same write.
+          && !('ordemCategorias' in next().diff(prev()).affectedKeys());
       }
 
       // (b) OWNER MANAGES — the house owner approves (pendente->ativo, adding to
@@ -159,7 +222,25 @@ service cloud.firestore {
           // from everyone else's stream (griefing DoS). All three lines pin it.
           && next().membrosAtivos.hasOnly(prev().membrosAtivos)                  // no additions
           && prev().membrosAtivos.hasOnly(next().membrosAtivos.concat([uid()]))  // removed at most uid()
-          && !(uid() in next().membrosAtivos);                                   // removed uid()
+          && !(uid() in next().membrosAtivos)                                    // removed uid()
+          // Leaving is not the place to edit the house category order (a
+          // pendente may self-leave but is not an ACTIVE member).
+          && !('ordemCategorias' in next().diff(prev()).affectedKeys());
+      }
+
+      // (d) EDIT CATEGORY ORDER — any ACTIVE member may set the per-house
+      //     `ordemCategorias`, and ONLY that field. Keyed off the membros map,
+      //     so pendentes and non-members are denied. Because the diff is pinned
+      //     to exactly that one key, this path cannot touch membros,
+      //     membrosAtivos, criadoPor/criadoEm/codigo or house metadata — it is
+      //     not a hole in the join/manage/leave model. Shape is validated as a
+      //     bounded list; membership-in-the-8 / dedup is left to the client
+      //     (see note below).
+      function editOrdemCategorias() {
+        return isActiveMemberOfCurrent()
+          && next().diff(prev()).affectedKeys().hasOnly(['ordemCategorias'])
+          && next().ordemCategorias is list
+          && next().ordemCategorias.size() <= 20;
       }
 
       // ---- itens (pantry) -------------------------------------------------
@@ -169,7 +250,7 @@ service cloud.firestore {
       match /itens/{itemId} {
         allow read, delete: if isActiveMemberOf(casaId);
         allow create, update: if isActiveMemberOf(casaId)
-          && next().status in ['tem', 'nao_tem', 'no_carrinho'];
+          && itemWriteValid();
       }
     }
 

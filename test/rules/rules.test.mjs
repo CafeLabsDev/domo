@@ -555,6 +555,345 @@ describe('codigos write authorization', () => {
   });
 });
 
+// -- itens: optional quantity + minimum-stock control ------------------------
+// ON-mode items derive status from quantidade <= estoqueMinimo, carry the cart
+// state on `noCarrinho`, and the rules pin the stored status to the derived
+// value. OFF-mode items must keep behaving exactly as before.
+
+describe('itens quantity control', () => {
+  test('active member turns control ON with derived nao_tem (qty <= min)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 0,
+        estoqueMinimo: 2,
+        noCarrinho: false,
+        status: 'nao_tem', // derived: 0 <= 2
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('active member turns control ON with derived tem (qty > min)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 5,
+        estoqueMinimo: 2,
+        noCarrinho: false,
+        status: 'tem', // derived: 5 > 2
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode item may be flagged in-cart via noCarrinho', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 0,
+        estoqueMinimo: 2,
+        noCarrinho: true,
+        status: 'nao_tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects a status inconsistent with quantity (should be nao_tem)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 0,
+        estoqueMinimo: 2,
+        status: 'tem', // WRONG: 0 <= 2 must derive nao_tem
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects a status inconsistent with quantity (should be tem)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 5,
+        estoqueMinimo: 2,
+        status: 'nao_tem', // WRONG: 5 > 2 must derive tem
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects no_carrinho in the derived status', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 0,
+        estoqueMinimo: 2,
+        status: 'no_carrinho', // ON-mode status is only tem/nao_tem
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects a negative quantidade', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: -1,
+        estoqueMinimo: 2,
+        status: 'nao_tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects a non-int quantidade', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 1.5,
+        estoqueMinimo: 2,
+        status: 'nao_tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('ON-mode rejects a missing estoqueMinimo', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: true,
+        quantidade: 3,
+        status: 'tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('create an ON-mode item directly (falls at/above minimum)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      setDoc(itemRef(db(MEMBER), 'itemQ'), {
+        nome: 'Leite',
+        categoria: 'Laticínios',
+        controlaEstoque: true,
+        quantidade: 1,
+        estoqueMinimo: 1,
+        noCarrinho: false,
+        status: 'nao_tem', // 1 <= 1
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('OFF-mode item is unchanged: manual no_carrinho still allowed', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(itemRef(db(MEMBER)), {
+        status: 'no_carrinho',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('OFF-mode explicit controlaEstoque:false with retained qty is allowed', async () => {
+    await seedCasa();
+    // toggle-off keeps quantidade/estoqueMinimo on the doc, freezes a manual status
+    await assertSucceeds(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: false,
+        noCarrinho: false,
+        quantidade: 4,
+        estoqueMinimo: 2,
+        status: 'tem', // manual, NOT required to match the derivation when OFF
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('OFF-mode rejects a stray noCarrinho:true (cart lives in status enum)', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: false,
+        noCarrinho: true,
+        status: 'nao_tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('rejects a non-bool controlaEstoque', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(MEMBER)), {
+        controlaEstoque: 'yes',
+        status: 'tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: MEMBER,
+      }),
+    );
+  });
+
+  test('pendente still cannot write an ON-mode item', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(itemRef(db(PENDING)), {
+        controlaEstoque: true,
+        quantidade: 0,
+        estoqueMinimo: 1,
+        status: 'nao_tem',
+        atualizadoEm: new Date(),
+        atualizadoPor: PENDING,
+      }),
+    );
+  });
+});
+
+// -- ordemCategorias (per-house category order) ------------------------------
+// Any ACTIVE member may set the house-level category order, and ONLY that
+// field. Pendentes and non-members are denied, and the other update flows
+// (join / owner-manage / self-leave) must stay intact.
+
+describe('ordemCategorias', () => {
+  const ORDER = [
+    'Bebidas',
+    'Frutas e Verduras',
+    'Laticínios',
+    'Carnes e Peixes',
+    'Padaria',
+    'Limpeza',
+    'Higiene e Cuidados',
+    'Outros',
+  ];
+
+  test('active member sets ordemCategorias', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(MEMBER)), { ordemCategorias: ORDER }),
+    );
+  });
+
+  test('owner sets ordemCategorias (owner is an active member)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(OWNER)), { ordemCategorias: ORDER }),
+    );
+  });
+
+  test('pendente cannot set ordemCategorias', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(PENDING)), { ordemCategorias: ORDER }),
+    );
+  });
+
+  test('non-member cannot set ordemCategorias', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(STRANGER)), { ordemCategorias: ORDER }),
+    );
+  });
+
+  test('ordemCategorias must be a list, not another type', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(MEMBER)), { ordemCategorias: 'Bebidas' }),
+    );
+  });
+
+  // The rule caps ordemCategorias at 20 entries (defensive against an
+  // oversized/abusive write; the client only ever sends the fixed 8
+  // categories) — this branch had no test asserting it actually rejects.
+  test('ordemCategorias longer than 20 entries is rejected', async () => {
+    await seedCasa();
+    const oversized = Array.from({ length: 21 }, (_, i) => `Categoria ${i}`);
+    await assertFails(
+      updateDoc(casaRef(db(MEMBER)), { ordemCategorias: oversized }),
+    );
+  });
+
+  test('the ordemCategorias path cannot smuggle a change to another field', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(MEMBER)), {
+        ordemCategorias: ORDER,
+        nome: 'Roubada', // not allowed via this path (member is not owner)
+      }),
+    );
+  });
+
+  test('the ordemCategorias path cannot smuggle a membrosAtivos escalation', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(MEMBER)), {
+        ordemCategorias: ORDER,
+        membrosAtivos: arrayUnion(STRANGER),
+      }),
+    );
+  });
+
+  test('a joiner cannot also edit ordemCategorias while joining', async () => {
+    await seedCasa();
+    await assertFails(
+      updateDoc(casaRef(db(STRANGER)), {
+        [`membros.${STRANGER}`]: membro(STRANGER, 'pendente', 'Membro'),
+        ordemCategorias: ORDER,
+      }),
+    );
+  });
+
+  // Regression: the existing three update flows still work with the new field.
+  test('owner can still rename the house (owner-manage flow intact)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(OWNER)), { nome: 'Casa Renomeada' }),
+    );
+  });
+
+  test('member can still self-leave (self-leave flow intact)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(MEMBER)), {
+        [`membros.${MEMBER}`]: deleteField(),
+        membrosAtivos: arrayRemove(MEMBER),
+      }),
+    );
+  });
+
+  test('non-member can still join as pendente (join flow intact)', async () => {
+    await seedCasa();
+    await assertSucceeds(
+      updateDoc(casaRef(db(STRANGER)), {
+        [`membros.${STRANGER}`]: membro(STRANGER, 'pendente', 'Membro'),
+      }),
+    );
+  });
+});
+
 // -- unauthenticated writes are denied everywhere ----------------------------
 
 describe('unauthenticated writes', () => {

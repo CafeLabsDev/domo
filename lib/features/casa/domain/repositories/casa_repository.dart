@@ -42,4 +42,12 @@ abstract class CasaRepository {
   });
 
   Future<void> deletarCasa({required String casaId});
+
+  /// Save the per-house category display order. Any active member may call this
+  /// (enforced in firestore.rules). [ordem] holds the existing category strings
+  /// in the chosen order.
+  Future<void> atualizarOrdemCategorias({
+    required String casaId,
+    required List<String> ordem,
+  });
 }

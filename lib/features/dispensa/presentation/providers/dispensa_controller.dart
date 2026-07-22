@@ -84,16 +84,62 @@ class DispensaController extends _$DispensaController {
 
   Future<void> atualizarDispensaEmLote({
     required String casaId,
-    required List<String> itemIds,
+    required List<PantryItem> itens,
   }) async {
     final user = ref.read(authStateProvider).valueOrNull;
-    if (user == null || itemIds.isEmpty) return;
+    if (user == null || itens.isEmpty) return;
 
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () => ref.read(dispensaRepositoryProvider).atualizarDispensaEmLote(
             casaId: casaId,
-            itemIds: itemIds,
+            itens: itens,
+            userId: user.uid,
+          ),
+    );
+  }
+
+  /// Quick quantity adjustment (ON-mode items only) — used by the pantry
+  /// card's +/- stepper. Not wrapped in `AsyncLoading` first (unlike the
+  /// mutations above): this fires on every stepper tap and flashing a
+  /// loading state on a widget this small/frequent would be more noise than
+  /// signal; the guarded result still lands in `state` for error surfacing.
+  Future<void> atualizarQuantidade({
+    required String casaId,
+    required String itemId,
+    required int quantidade,
+    required int estoqueMinimo,
+  }) async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    state = await AsyncValue.guard(
+      () => ref.read(dispensaRepositoryProvider).atualizarQuantidade(
+            casaId: casaId,
+            itemId: itemId,
+            quantidade: quantidade,
+            estoqueMinimo: estoqueMinimo,
+            userId: user.uid,
+          ),
+    );
+  }
+
+  /// Mark/unmark an ON-mode item as being in the cart this trip (Mercado's
+  /// equivalent of `atualizarStatus` for OFF-mode items — ON-mode never
+  /// cycles `status` manually, see `PantryItem.estaNoCarrinho`).
+  Future<void> marcarNoCarrinho({
+    required String casaId,
+    required String itemId,
+    required bool noCarrinho,
+  }) async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) return;
+
+    state = await AsyncValue.guard(
+      () => ref.read(dispensaRepositoryProvider).marcarNoCarrinho(
+            casaId: casaId,
+            itemId: itemId,
+            noCarrinho: noCarrinho,
             userId: user.uid,
           ),
     );

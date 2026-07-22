@@ -95,7 +95,7 @@ status "Em falta"), nunca um hex fixo — resolve automaticamente para o par
   (`/dispensa`, `/mercado`, `/casa`, `/perfil`), preservando o estado de cada
   branch ao trocar de aba (`HomeShell` em `shared/widgets/`).
 - Rotas fora do shell (sem nav bar): `/auth/login`, `/auth/register`,
-  `/casa/gate`, `/casa/criar`, `/casa/entrar`.
+  `/casa/gate`, `/casa/criar`, `/casa/entrar`, `/casa/categorias`.
 
 ```
 /auth/login          LoginPage
@@ -103,12 +103,22 @@ status "Em falta"), nunca um hex fixo — resolve automaticamente para o par
 /casa/gate           CasaGatePage
 /casa/criar          CriarCasaPage
 /casa/entrar         EntrarCasaPage
+/casa/categorias     CategoriaOrdemPage
 StatefulShellRoute (NavigationBar)
   /dispensa          DispensaPage
   /mercado           MercadoPage
   /casa              CasaPage
   /perfil            ProfilePage
 ```
+
+`/casa/categorias` (`categoria_ordem_page.dart`) é uma `ReorderableListView`
+para a ordem de exibição das categorias da dispensa naquela casa
+(`CasaModel.ordemCategorias`, opcional — `null` cai no `kDispensaCategorias`
+hardcoded). Alcançada por um ícone dedicado na `AppBar` da `CasaPage`, fora do
+`PopupMenuButton` de ações administrativas/destrutivas, porque qualquer membro
+ativo pode reordenar (não é uma ação de dono da casa). Dispensa e Mercado
+renderizam as categorias na ordem da casa via o helper
+`categoriasOrdenadas(...)` em `dispensa/domain/constants.dart`.
 
 ## Tema e identidade visual
 
@@ -135,10 +145,16 @@ padrão antigo `Text('Erro: $e')` em toda a base (`docs/DESIGN.md` §4.7).
 `FirebaseAnalytics`, inicializado em `main.dart` sem bloquear o boot
 (`unawaited(...).catchError((_) {})` — analytics é opcional e uma falha nele
 nunca pode travar a tela branca de inicialização; ver commit
-`dc9442e`, que corrigiu exatamente esse caso). Instrumenta só 4 eventos que
-rastreiam até as métricas de sucesso do refactor (`casa_criada`,
-`casa_entrou`, `item_status_alterado`, `carrinho_fechado`) — nenhum carrega
-PII (nome, foto, código de convite), só enums/contagens.
+`dc9442e`, que corrigiu exatamente esse caso). Instrumenta só 6 eventos que
+rastreiam até as métricas de sucesso do refactor e das duas features mais
+recentes (`casa_criada`, `casa_entrou`, `item_status_alterado`,
+`carrinho_fechado`, `item_quantidade_atualizada`,
+`casa_ordem_categorias_alterada`) — nenhum carrega PII (nome, foto, código de
+convite, nome de item/categoria), só enums/contagens.
+`item_quantidade_atualizada` dispara só em edição deliberada do usuário
+(`DispensaRepositoryImpl.atualizarQuantidade`), nunca no bump automático de
+fechamento de carrinho (`atualizarDispensaEmLote`) — ver doc do método em
+`analytics_service.dart` para o porquê dessa distinção.
 
 ## Backend
 

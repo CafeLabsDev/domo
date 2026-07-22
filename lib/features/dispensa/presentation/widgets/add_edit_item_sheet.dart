@@ -23,9 +23,13 @@ class AddEditItemSheet extends ConsumerStatefulWidget {
 
 class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
   late final TextEditingController _nomeController;
+  late final TextEditingController _quantidadeController;
+  late final TextEditingController _estoqueMinimoController;
   late String _categoria;
+  late bool _controlaEstoque;
   bool _isLoading = false;
   String? _nomeError;
+  String? _quantidadeError;
   String? _saveError;
 
   bool get _isEditing => widget.item != null;
@@ -35,12 +39,47 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
     super.initState();
     _nomeController = TextEditingController(text: widget.item?.nome ?? '');
     _categoria = widget.item?.categoria ?? kDispensaCategorias.last;
+    _controlaEstoque = widget.item?.controlaEstoque ?? false;
+    _quantidadeController = TextEditingController(
+      text: widget.item?.quantidade?.toString() ?? '',
+    );
+    _estoqueMinimoController = TextEditingController(
+      text: widget.item?.estoqueMinimo?.toString() ?? '',
+    );
   }
 
   @override
   void dispose() {
     _nomeController.dispose();
+    _quantidadeController.dispose();
+    _estoqueMinimoController.dispose();
     super.dispose();
+  }
+
+  /// Toggle-on UX (product spec): pre-fill quantidade/estoqueMinimo so the
+  /// derived status doesn't jarringly flip on activation — "tem" preserves
+  /// as quantidade=2/estoqueMinimo=1, anything else (falta/no carrinho)
+  /// preserves as quantidade=0/estoqueMinimo=1. Only applied the first time
+  /// the switch flips on (fields still empty); if the user toggles off and
+  /// back on within the same sheet session, whatever they'd already typed is
+  /// kept.
+  void _onControlaEstoqueChanged(bool value) {
+    setState(() {
+      _controlaEstoque = value;
+      _quantidadeError = null;
+      if (value &&
+          _quantidadeController.text.isEmpty &&
+          _estoqueMinimoController.text.isEmpty) {
+        final statusAtual = widget.item?.status ?? ItemStatus.naoTem;
+        if (statusAtual == ItemStatus.tem) {
+          _quantidadeController.text = '2';
+          _estoqueMinimoController.text = '1';
+        } else {
+          _quantidadeController.text = '0';
+          _estoqueMinimoController.text = '1';
+        }
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -53,24 +92,74 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
       return;
     }
 
+    int? quantidade;
+    int? estoqueMinimo;
+    if (_controlaEstoque) {
+      quantidade = int.tryParse(_quantidadeController.text.trim());
+      estoqueMinimo = int.tryParse(_estoqueMinimoController.text.trim());
+      if (quantidade == null ||
+          quantidade < 0 ||
+          estoqueMinimo == null ||
+          estoqueMinimo < 0) {
+        setState(() {
+          _quantidadeError =
+              'Informe quantidade e estoque mínimo (0 ou mais).';
+          _saveError = null;
+        });
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _nomeError = null;
+      _quantidadeError = null;
       _saveError = null;
     });
 
     try {
       final repo = ref.read(dispensaRepositoryProvider);
+      final user = ref.read(authStateProvider).valueOrNull;
 
       if (_isEditing) {
+        final item = widget.item!;
         await repo.atualizarItem(
           casaId: widget.casaId,
-          itemId: widget.item!.id,
+          itemId: item.id,
           nome: nome,
           categoria: _categoria,
         );
+
+        if (user != null) {
+          if (_controlaEstoque && !item.controlaEstoque) {
+            await repo.ativarControleEstoque(
+              casaId: widget.casaId,
+              itemId: item.id,
+              quantidade: quantidade!,
+              estoqueMinimo: estoqueMinimo!,
+              userId: user.uid,
+            );
+          } else if (!_controlaEstoque && item.controlaEstoque) {
+            await repo.desativarControleEstoque(
+              casaId: widget.casaId,
+              itemId: item.id,
+              statusCongelado: item.status,
+              userId: user.uid,
+            );
+          } else if (_controlaEstoque &&
+              item.controlaEstoque &&
+              (quantidade != item.quantidade ||
+                  estoqueMinimo != item.estoqueMinimo)) {
+            await repo.atualizarQuantidade(
+              casaId: widget.casaId,
+              itemId: item.id,
+              quantidade: quantidade!,
+              estoqueMinimo: estoqueMinimo!,
+              userId: user.uid,
+            );
+          }
+        }
       } else {
-        final user = ref.read(authStateProvider).valueOrNull;
         if (user == null) return;
         await repo.adicionarItem(
           casaId: widget.casaId,
@@ -146,6 +235,67 @@ class _AddEditItemSheetState extends ConsumerState<AddEditItemSheet> {
                 .map((c) => DropdownMenuEntry(value: c, label: c))
                 .toList(),
           ),
+          // Quantity/minimum-stock control is opt-in and only makes sense for
+          // an item that already exists (the toggle calls
+          // ativarControleEstoque/desativarControleEstoque, which need an
+          // itemId) — a brand-new item is created OFF, same as before.
+          if (_isEditing) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Controlar quantidade'),
+              subtitle: const Text(
+                'Acompanhe a quantidade e um estoque mínimo deste item.',
+              ),
+              value: _controlaEstoque,
+              onChanged: _onControlaEstoqueChanged,
+            ),
+            if (_controlaEstoque) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _quantidadeController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) {
+                        if (_quantidadeError != null) {
+                          setState(() => _quantidadeError = null);
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Quantidade',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: TextField(
+                      controller: _estoqueMinimoController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) {
+                        if (_quantidadeError != null) {
+                          setState(() => _quantidadeError = null);
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Estoque mínimo',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (_quantidadeError != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _quantidadeError!,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+            ],
+          ],
           if (_saveError != null) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(

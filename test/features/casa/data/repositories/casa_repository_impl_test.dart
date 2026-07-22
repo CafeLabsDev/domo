@@ -20,6 +20,9 @@ void main() {
     analytics = _MockAnalyticsService();
     when(() => analytics.logCasaCriada()).thenAnswer((_) async {});
     when(() => analytics.logCasaEntrou()).thenAnswer((_) async {});
+    when(() => analytics.logCasaOrdemCategoriasAlterada(
+          quantidadeCategorias: any(named: 'quantidadeCategorias'),
+        )).thenAnswer((_) async {});
     repo = CasaRepositoryImpl(firestore: firestore, analytics: analytics);
   });
 
@@ -136,6 +139,46 @@ void main() {
           await firestore.collection('codigos').doc(casa.codigo).get();
       expect(casaSnap.exists, isFalse);
       expect(codigoSnap.exists, isFalse);
+    });
+  });
+
+  group('atualizarOrdemCategorias', () {
+    test('grava ordemCategorias no doc da casa', () async {
+      final casa = await repo.criarCasa(
+        nome: 'Casa da Ordem',
+        userId: 'u1',
+        nomeUsuario: 'Ana',
+      );
+
+      final ordem = ['Bebidas', 'Outros', 'Laticínios'];
+      await repo.atualizarOrdemCategorias(casaId: casa.id, ordem: ordem);
+
+      final casaSnap =
+          await firestore.collection('casas').doc(casa.id).get();
+      expect(casaSnap.data()!['ordemCategorias'], ordem);
+    });
+
+    test('não toca em outros campos da casa (nome, membros, criadoPor)',
+        () async {
+      final casa = await repo.criarCasa(
+        nome: 'Casa Intacta',
+        userId: 'u1',
+        nomeUsuario: 'Ana',
+      );
+
+      await repo.atualizarOrdemCategorias(
+        casaId: casa.id,
+        ordem: ['Bebidas'],
+      );
+
+      final casaSnap =
+          await firestore.collection('casas').doc(casa.id).get();
+      expect(casaSnap.data()!['nome'], 'Casa Intacta');
+      expect(casaSnap.data()!['criadoPor'], 'u1');
+      expect(
+        (casaSnap.data()!['membros'] as Map<String, dynamic>).containsKey('u1'),
+        isTrue,
+      );
     });
   });
 }

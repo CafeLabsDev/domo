@@ -93,18 +93,23 @@ class PantryItemCard extends ConsumerWidget {
                 ),
               ),
             ),
-            _StatusToggleZone(
-              key: ValueKey('status-toggle-${item.id}'),
-              status: item.status,
-              onTap: () => controller.atualizarStatus(
-                casaId: item.casaId,
-                itemId: item.id,
-                statusAnterior: item.status,
-                novoStatus: item.status == ItemStatus.tem
-                    ? ItemStatus.naoTem
-                    : ItemStatus.tem,
-              ),
-            ),
+            item.controlaEstoque
+                ? _QuantityZone(
+                    key: ValueKey('quantity-zone-${item.id}'),
+                    item: item,
+                  )
+                : _StatusToggleZone(
+                    key: ValueKey('status-toggle-${item.id}'),
+                    status: item.status,
+                    onTap: () => controller.atualizarStatus(
+                      casaId: item.casaId,
+                      itemId: item.id,
+                      statusAnterior: item.status,
+                      novoStatus: item.status == ItemStatus.tem
+                          ? ItemStatus.naoTem
+                          : ItemStatus.tem,
+                    ),
+                  ),
           ],
         ),
       ),
@@ -130,6 +135,148 @@ class _StatusDot extends StatelessWidget {
       width: 10,
       height: 10,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+/// ON-mode (quantity-controlled) items' zone: replaces the manual status
+/// toggle with a compact quantity stepper + minimum-stock caption. Per the
+/// product spec the user never manually cycles status for ON items — status
+/// is DERIVED from `quantidade`/`estoqueMinimo` (`PantryItem.emFalta`) — so
+/// this zone's only interaction is adjusting the quantity, wired straight to
+/// `DispensaController.atualizarQuantidade`. Reuses the same tonal
+/// container/on-container recipe as `_StatusToggleZone` (keyed off the
+/// item's derived `status`) so an ON item reads with the same visual weight
+/// as an OFF item's chip, just with different content.
+class _QuantityZone extends ConsumerWidget {
+  const _QuantityZone({super.key, required this.item});
+  final PantryItem item;
+
+  static const _width = 108.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final quantidade = item.quantidade ?? 0;
+    final estoqueMinimo = item.estoqueMinimo ?? 0;
+    // Grab the notifier once at build time (same pattern as
+    // `PantryItemCard.build`'s `controller` local), not lazily via
+    // `ref.read(...)` inside the tap handler: `dispensaControllerProvider` is
+    // auto-dispose and nothing here keeps it alive between builds, so a
+    // `ref.read` at tap time can re-create the provider against the SAME
+    // already-initialized notifier instance an `overrideWith` factory
+    // returns in tests, which crashes. Holding the already-resolved instance
+    // sidesteps a second provider lookup entirely.
+    final controller = ref.read(dispensaControllerProvider.notifier);
+
+    final (bgColor, textColor) = item.status == ItemStatus.naoTem
+        ? (isDark
+            ? (
+                AppColors.statusFaltaContainerDark,
+                AppColors.onStatusFaltaContainerDark
+              )
+            : (
+                AppColors.statusFaltaContainerLight,
+                AppColors.onStatusFaltaContainerLight
+              ))
+        : (isDark
+            ? (
+                AppColors.statusTemContainerDark,
+                AppColors.onStatusTemContainerDark
+              )
+            : (
+                AppColors.statusTemContainerLight,
+                AppColors.onStatusTemContainerLight
+              ));
+
+    void ajustar(int delta) {
+      final nova = quantidade + delta;
+      if (nova < 0) return;
+      controller.atualizarQuantidade(
+            casaId: item.casaId,
+            itemId: item.id,
+            quantidade: nova,
+            estoqueMinimo: estoqueMinimo,
+          );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8).copyWith(right: 16),
+      child: SizedBox(
+        width: _width,
+        child: Material(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _StepperButton(
+                      key: ValueKey('quantity-minus-${item.id}'),
+                      icon: Icons.remove_rounded,
+                      color: textColor,
+                      onTap: () => ajustar(-1),
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Text(
+                        '$quantidade',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: textColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _StepperButton(
+                      key: ValueKey('quantity-plus-${item.id}'),
+                      icon: Icons.add_rounded,
+                      color: textColor,
+                      onTap: () => ajustar(1),
+                    ),
+                  ],
+                ),
+                Text(
+                  'mín $estoqueMinimo',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: textColor.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: Icon(icon, size: 16, color: color),
+      ),
     );
   }
 }

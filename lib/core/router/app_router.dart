@@ -8,6 +8,7 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/casa/presentation/pages/casa_gate_page.dart';
 import '../../features/casa/presentation/pages/casa_page.dart';
+import '../../features/casa/presentation/pages/categoria_ordem_page.dart';
 import '../../features/casa/presentation/pages/criar_casa_page.dart';
 import '../../features/casa/presentation/pages/entrar_casa_page.dart';
 import '../../features/casa/presentation/providers/casa_provider.dart';
@@ -87,6 +88,13 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(
         path: '/casa/entrar',
         builder: (_, _) => const EntrarCasaPage(),
+      ),
+
+      // Pushed on top of the shell from CasaPage (keeps the nav bar hidden
+      // while reordering, same reasoning as /casa/criar and /casa/entrar).
+      GoRoute(
+        path: '/casa/categorias',
+        builder: (_, _) => const CategoriaOrdemPage(),
       ),
 
       // Home shell com nav bar

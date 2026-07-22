@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
+import '../../domain/constants.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/dispensa_controller.dart';
 import '../providers/dispensa_provider.dart';
@@ -30,16 +31,20 @@ class DispensaPage extends ConsumerWidget {
       ),
       data: (casa) {
         if (casa == null) return const Scaffold(body: SizedBox.shrink());
-        return _DispensaContent(casaId: casa.id);
+        return _DispensaContent(
+          casaId: casa.id,
+          ordemCategorias: casa.ordemCategorias,
+        );
       },
     );
   }
 }
 
 class _DispensaContent extends ConsumerWidget {
-  const _DispensaContent({required this.casaId});
+  const _DispensaContent({required this.casaId, this.ordemCategorias});
 
   final String casaId;
+  final List<String>? ordemCategorias;
 
   void _openSheet(BuildContext context, {PantryItem? item}) {
     showModalBottomSheet(
@@ -73,14 +78,14 @@ class _DispensaContent extends ConsumerWidget {
           onRetry: () => ref.invalidate(itensProvider(casaId)),
         ),
         data: (todos) {
-          final itens = todos
-              .where((i) => i.status != ItemStatus.noCarrinho)
-              .toList();
+          final itens =
+              todos.where((i) => !i.estaNoCarrinho).toList();
           if (itens.isEmpty) {
             return _EmptyState(onAdd: () => _openSheet(context));
           }
           return _ItensGrouped(
             itens: itens,
+            ordemCategorias: ordemCategorias,
             onEdit: (item) => _openSheet(context, item: item),
             onDelete: (item) => controller.deletarItem(
               casaId: item.casaId,
@@ -98,9 +103,11 @@ class _ItensGrouped extends StatelessWidget {
     required this.itens,
     required this.onEdit,
     required this.onDelete,
+    this.ordemCategorias,
   });
 
   final List<PantryItem> itens;
+  final List<String>? ordemCategorias;
   final void Function(PantryItem) onEdit;
   final void Function(PantryItem) onDelete;
 
@@ -115,7 +122,12 @@ class _ItensGrouped extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grouped = _group(itens);
-    final categories = grouped.keys.toList()..sort();
+    // House's custom category order (feature 3), falling back to the fixed
+    // kDispensaCategorias order — then keep only categories that actually
+    // have items today, in that order.
+    final categories = categoriasOrdenadas(ordemCategorias)
+        .where(grouped.containsKey)
+        .toList();
     final theme = Theme.of(context);
 
     return ListView.builder(

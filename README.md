@@ -7,8 +7,8 @@ App de gestão doméstica para famílias e grupos — Android e Web.
 ## Funcionalidades
 
 - **Autenticação** — e-mail/senha e Google Sign-In
-- **Casa** — criar casa, entrar por código de 6 caracteres, gerenciar membros (aprovar, recusar, remover, definir cargo), sair ou deletar a casa
-- **Dispensa** — cadastro de itens por categoria com 3 status: *Tem*, *Em falta*, *No carrinho*
+- **Casa** — criar casa, entrar por código de 6 caracteres, gerenciar membros (aprovar, recusar, remover, definir cargo), sair ou deletar a casa; qualquer membro ativo pode reordenar as categorias da dispensa da casa (`/casa/categorias`)
+- **Dispensa** — cadastro de itens por categoria com 3 status: *Tem*, *Em falta*, *No carrinho*; opcionalmente, por item, controle de quantidade + estoque mínimo (o status passa a ser calculado automaticamente a partir desses números, em vez de alternado manualmente)
 - **Lista de Compras** — view filtrada da dispensa; marcar itens no carrinho e atualizar a dispensa em lote
 - **Perfil** — foto Google, cargo na casa, toggle de tema (Sistema / Claro / Escuro), logout
 
@@ -23,7 +23,7 @@ App de gestão doméstica para famílias e grupos — Android e Web.
 | Backend | Firebase Auth + Cloud Firestore |
 | Auth social | `google_sign_in ^6.2.0` |
 | Modelos | `freezed ^3.0.0` + `json_serializable` |
-| Analytics | `firebase_analytics ^11.4.4` (4 eventos mínimos, sem PII — ver `docs/ARQUITETURA.md`) |
+| Analytics | `firebase_analytics ^11.4.4` (6 eventos mínimos, sem PII — ver `docs/ARQUITETURA.md`) |
 | Imagens | `cached_network_image ^3.4.1` |
 | SVG | `flutter_svg ^2.0.10` |
 | Fonte | Google Fonts — Bitter (headings) + Manrope (corpo/UI), buscadas dinamicamente em runtime |

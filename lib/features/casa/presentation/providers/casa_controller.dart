@@ -102,4 +102,19 @@ class CasaController extends _$CasaController {
       () => ref.read(casaRepositoryProvider).deletarCasa(casaId: casaId),
     );
   }
+
+  /// Feature 3 — save the per-house category display order (any active
+  /// member may call this, enforced in firestore.rules).
+  Future<void> atualizarOrdemCategorias(
+    String casaId,
+    List<String> ordem,
+  ) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(casaRepositoryProvider).atualizarOrdemCategorias(
+            casaId: casaId,
+            ordem: ordem,
+          ),
+    );
+  }
 }

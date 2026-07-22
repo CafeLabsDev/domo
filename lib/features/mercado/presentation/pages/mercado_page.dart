@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../casa/presentation/providers/casa_provider.dart';
+import '../../../dispensa/domain/constants.dart';
 import '../../../dispensa/domain/models/pantry_item.dart';
 import '../../../dispensa/presentation/providers/dispensa_controller.dart';
 import '../../../dispensa/presentation/providers/dispensa_provider.dart';
@@ -29,16 +30,20 @@ class MercadoPage extends ConsumerWidget {
       ),
       data: (casa) {
         if (casa == null) return const Scaffold(body: SizedBox.shrink());
-        return _MercadoContent(casaId: casa.id);
+        return _MercadoContent(
+          casaId: casa.id,
+          ordemCategorias: casa.ordemCategorias,
+        );
       },
     );
   }
 }
 
 class _MercadoContent extends ConsumerWidget {
-  const _MercadoContent({required this.casaId});
+  const _MercadoContent({required this.casaId, this.ordemCategorias});
 
   final String casaId;
+  final List<String>? ordemCategorias;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,32 +62,40 @@ class _MercadoContent extends ConsumerWidget {
           onRetry: () => ref.invalidate(itensProvider(casaId)),
         ),
         data: (todos) {
+          // Needed-for-shopping = missing (OFF or ON derived) OR already
+          // sitting in the cart this trip — `estaNoCarrinho`/`emFalta`
+          // unify both modes so this view never branches on `controlaEstoque`
+          // itself (see `PantryItem` doc comments).
           final itens = todos
-              .where((i) =>
-                  i.status == ItemStatus.naoTem ||
-                  i.status == ItemStatus.noCarrinho)
+              .where((i) => i.emFalta || i.estaNoCarrinho)
               .toList();
 
           if (itens.isEmpty) return const _EmptyState();
 
-          final noCarrinho =
-              itens.where((i) => i.status == ItemStatus.noCarrinho).toList();
+          final noCarrinho = itens.where((i) => i.estaNoCarrinho).toList();
 
           return _ListaDeCompras(
             itens: itens,
-            onToggleItem: (item) => controller.atualizarStatus(
-              casaId: item.casaId,
-              itemId: item.id,
-              statusAnterior: item.status,
-              novoStatus: item.status == ItemStatus.noCarrinho
-                  ? ItemStatus.naoTem
-                  : ItemStatus.noCarrinho,
-            ),
+            ordemCategorias: ordemCategorias,
+            onToggleItem: (item) => item.controlaEstoque
+                ? controller.marcarNoCarrinho(
+                    casaId: item.casaId,
+                    itemId: item.id,
+                    noCarrinho: !item.noCarrinho,
+                  )
+                : controller.atualizarStatus(
+                    casaId: item.casaId,
+                    itemId: item.id,
+                    statusAnterior: item.status,
+                    novoStatus: item.status == ItemStatus.noCarrinho
+                        ? ItemStatus.naoTem
+                        : ItemStatus.noCarrinho,
+                  ),
             onAtualizarDispensa: noCarrinho.isEmpty
                 ? null
                 : () => controller.atualizarDispensaEmLote(
                       casaId: casaId,
-                      itemIds: noCarrinho.map((i) => i.id).toList(),
+                      itens: noCarrinho,
                     ),
             quantidadeNoCarrinho: noCarrinho.length,
           );
@@ -98,9 +111,11 @@ class _ListaDeCompras extends StatelessWidget {
     required this.onToggleItem,
     required this.onAtualizarDispensa,
     required this.quantidadeNoCarrinho,
+    this.ordemCategorias,
   });
 
   final List<PantryItem> itens;
+  final List<String>? ordemCategorias;
   final void Function(PantryItem) onToggleItem;
   final VoidCallback? onAtualizarDispensa;
   final int quantidadeNoCarrinho;
@@ -116,7 +131,9 @@ class _ListaDeCompras extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grouped = _group(itens);
-    final categories = grouped.keys.toList()..sort();
+    final categories = categoriasOrdenadas(ordemCategorias)
+        .where(grouped.containsKey)
+        .toList();
     final theme = Theme.of(context);
 
     return Column(
@@ -178,7 +195,7 @@ class _MercadoItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final noCarrinho = item.status == ItemStatus.noCarrinho;
+    final noCarrinho = item.estaNoCarrinho;
     // statusCarrinho reuses the `tertiary` token (docs/DESIGN.md §1.1: "in
     // the cart" borrows the collective-action accent).
     final statusCarrinho =

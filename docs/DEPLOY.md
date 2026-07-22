@@ -18,16 +18,30 @@ Runs on every push to `master`. Two independent jobs, both on GitHub Actions'
 free tier (public/private repo, this volume of pushes — nowhere near the
 2,000 free minutes/month):
 
-- **`flutter`** — `flutter pub get && flutter analyze && flutter test`.
+- **`flutter`** — `flutter pub get && flutter analyze && flutter test` (57
+  tests).
 - **`rules`** — spins up the Firestore emulator (`firebase-tools
-  emulators:exec`) and runs `test/rules/rules.test.mjs` against it (50 tests
+  emulators:exec`) and runs `test/rules/rules.test.mjs` against it (77 tests
   covering the default-deny rules model described in `docs/BACKEND.md`:
-  membership, ownership, pendente/ativo boundaries, `codigos` lookup, etc.).
-  Uses the emulator only — never touches production, needs no project
-  credentials.
+  membership, ownership, pendente/ativo boundaries, `codigos` lookup, item
+  quantity control, per-house category order, etc.). Uses the emulator only
+  — never touches production, needs no project credentials.
 
 CI does **not** deploy anything. It's a safety net for the code; shipping to
 production is still the deliberate manual action below.
+
+**Known testability gap (not a bug, recorded so it isn't rediscovered):**
+`DispensaRepositoryImpl`'s constructor only takes an optional `analytics` —
+unlike `CasaRepositoryImpl` (which also accepts an injectable `firestore`
+client), it always resolves `FirebaseFirestore.instance` internally. That
+means its write methods (`atualizarItem`, `atualizarQuantidade`,
+`atualizarDispensaEmLote`, etc.) can't be driven against
+`fake_cloud_firestore` the way `CasaRepositoryImpl`'s writes are — the 57
+Dart tests cover the dispensa domain/presentation layers and widget behavior,
+but not `DispensaRepositoryImpl`'s Firestore writes directly (those paths are
+only exercised indirectly, end-to-end, via the rules emulator suite and
+manual/production use). Worth constructor-injecting `firestore` there too as
+a follow-up, mirroring the pattern `casa` already uses.
 
 To debug a CI failure locally, run the same commands: `flutter analyze`,
 `flutter test`, or

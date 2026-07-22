@@ -53,11 +53,34 @@ wicker basket by the door. Concretely, this shows up as:
   yet: the color vocabulary is ready for it without promising it visually
   today (no per-item attribution UI is added in this pass).
 
-**What this explicitly does NOT do:** no quantity/stock-level visuals, no
-expiry dates, no progress bars on pantry items — the data model is a ternary
-status (Tem / Em falta / No carrinho), nothing else, and the components in
-§4 are built for exactly that, not for a richer inventory model Domo doesn't
-have.
+**Update — quantity control shipped after this spec, reconciled here:** this
+spec originally said the app would carry no quantity/stock-level visuals,
+reasoning from a purely-ternary data model (Tem / Em falta / No carrinho).
+That's no longer accurate: an **opt-in, per-item** quantity + minimum-stock
+control now exists (`PantryItem.controlaEstoque`, default off — every item
+that doesn't turn it on keeps looking exactly as this spec originally
+describes). What still holds, and was the actual intent behind the original
+caveat: **no expiry dates, no progress bars, no richer inventory model** —
+this is strictly "a number and a minimum," not a stock-management app.
+
+Concretely, the quantity control (`_QuantityZone`,
+`pantry_item_card.dart`) replaces the status-toggle zone *only* on items
+that opted in, and was built to slot into the existing visual language
+rather than add a new one:
+- It reuses the **same tonal container/on-container recipe** as the
+  ordinary status chip (§1.1/§4.1 table — `statusTem`/`statusFalta`
+  containers), keyed off the item's derived status, so an ON item's zone
+  reads at the same visual weight as an OFF item's chip, just with a
+  stepper (−, count, +) and a `mín N` caption instead of a status label. No
+  new color tokens were introduced for this.
+- Status itself is still exactly the same ternary the chip/dot vocabulary
+  (§1.1, §4.1) was built for — it's now sometimes *derived* from
+  `quantidade`/`estoqueMinimo` instead of always toggled manually, but the
+  chip/dot component itself, and everywhere else in the app that reads
+  `ItemStatus`, is unchanged.
+- The add/edit item sheet (§4.5) gained a toggle + inline quantity/minimum
+  fields for existing items — no new component family, same sheet chrome
+  and validation-message pattern already specced there.
 
 ---
 

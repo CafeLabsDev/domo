@@ -14,6 +14,10 @@ _PantryItem _$PantryItemFromJson(Map<String, dynamic> json) => _PantryItem(
   status: $enumDecode(_$ItemStatusEnumMap, json['status']),
   atualizadoEm: const _TimestampConverter().fromJson(json['atualizadoEm']),
   atualizadoPor: json['atualizadoPor'] as String,
+  controlaEstoque: json['controlaEstoque'] as bool? ?? false,
+  quantidade: (json['quantidade'] as num?)?.toInt(),
+  estoqueMinimo: (json['estoqueMinimo'] as num?)?.toInt(),
+  noCarrinho: json['noCarrinho'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$PantryItemToJson(_PantryItem instance) =>
@@ -25,6 +29,10 @@ Map<String, dynamic> _$PantryItemToJson(_PantryItem instance) =>
       'status': _$ItemStatusEnumMap[instance.status]!,
       'atualizadoEm': const _TimestampConverter().toJson(instance.atualizadoEm),
       'atualizadoPor': instance.atualizadoPor,
+      'controlaEstoque': instance.controlaEstoque,
+      'quantidade': instance.quantidade,
+      'estoqueMinimo': instance.estoqueMinimo,
+      'noCarrinho': instance.noCarrinho,
     };
 
 const _$ItemStatusEnumMap = {

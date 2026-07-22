@@ -207,4 +207,18 @@ class CasaRepositoryImpl implements CasaRepository {
     batch.delete(docRef);
     await batch.commit();
   }
+
+  @override
+  Future<void> atualizarOrdemCategorias({
+    required String casaId,
+    required List<String> ordem,
+  }) async {
+    await _casas.doc(casaId).update({'ordemCategorias': ordem});
+
+    unawaited(
+      _analytics.logCasaOrdemCategoriasAlterada(
+        quantidadeCategorias: ordem.length,
+      ),
+    );
+  }
 }

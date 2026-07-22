@@ -66,4 +66,31 @@ class AnalyticsService {
       parameters: {'quantidade_itens': quantidadeItens},
     );
   }
+
+  /// "Quantidade atualizada" — fires on a *deliberate* user edit of an
+  /// ON-mode item's `quantidade` (the pantry card's +/- stepper, or the
+  /// edit-item form), i.e. `DispensaRepositoryImpl.atualizarQuantidade`.
+  /// This is the one signal for whether households keep the number honest
+  /// over time, so it must stay uncontaminated by automation: it does
+  /// **not** fire for the cart-close default bump
+  /// (`atualizarDispensaEmLote` setting `quantidade = estoqueMinimo + 1`),
+  /// which is a system default standing in for a number nobody actually
+  /// typed, not evidence of maintenance. Carries only the resulting derived
+  /// status (`tem`/`nao_tem`), never the item name or the raw quantity.
+  Future<void> logItemQuantidadeAtualizada({required String statusResultante}) {
+    return _analytics.logEvent(
+      name: 'item_quantidade_atualizada',
+      parameters: {'status_resultante': statusResultante},
+    );
+  }
+
+  /// "Ordem de categorias alterada" — fires once a house saves a reordered
+  /// category list via `CasaRepositoryImpl.atualizarOrdemCategorias`.
+  /// Carries only the category count, never the category names/order.
+  Future<void> logCasaOrdemCategoriasAlterada({required int quantidadeCategorias}) {
+    return _analytics.logEvent(
+      name: 'casa_ordem_categorias_alterada',
+      parameters: {'quantidade_categorias': quantidadeCategorias},
+    );
+  }
 }

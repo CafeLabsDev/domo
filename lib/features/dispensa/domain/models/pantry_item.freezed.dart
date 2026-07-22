@@ -15,7 +15,13 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$PantryItem {
 
- String get id; String get casaId; String get nome; String get categoria; ItemStatus get status;@_TimestampConverter() DateTime get atualizadoEm; String get atualizadoPor;
+ String get id; String get casaId; String get nome; String get categoria; ItemStatus get status;@_TimestampConverter() DateTime get atualizadoEm; String get atualizadoPor;// ---- optional quantity + minimum-stock control (opt-in, default off) ----
+// When `controlaEstoque` is true, `status` is DERIVED from
+// quantidade <= estoqueMinimo (=> naoTem, else tem) and is never marked
+// manually; the shopping-cart state is carried by `noCarrinho` instead of
+// the status enum. When false (or absent, for pre-existing items) the item
+// behaves EXACTLY as before: manual 3-value `status`, cart = noCarrinho.
+ bool get controlaEstoque; int? get quantidade; int? get estoqueMinimo; bool get noCarrinho;
 /// Create a copy of PantryItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +34,16 @@ $PantryItemCopyWith<PantryItem> get copyWith => _$PantryItemCopyWithImpl<PantryI
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PantryItem&&(identical(other.id, id) || other.id == id)&&(identical(other.casaId, casaId) || other.casaId == casaId)&&(identical(other.nome, nome) || other.nome == nome)&&(identical(other.categoria, categoria) || other.categoria == categoria)&&(identical(other.status, status) || other.status == status)&&(identical(other.atualizadoEm, atualizadoEm) || other.atualizadoEm == atualizadoEm)&&(identical(other.atualizadoPor, atualizadoPor) || other.atualizadoPor == atualizadoPor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PantryItem&&(identical(other.id, id) || other.id == id)&&(identical(other.casaId, casaId) || other.casaId == casaId)&&(identical(other.nome, nome) || other.nome == nome)&&(identical(other.categoria, categoria) || other.categoria == categoria)&&(identical(other.status, status) || other.status == status)&&(identical(other.atualizadoEm, atualizadoEm) || other.atualizadoEm == atualizadoEm)&&(identical(other.atualizadoPor, atualizadoPor) || other.atualizadoPor == atualizadoPor)&&(identical(other.controlaEstoque, controlaEstoque) || other.controlaEstoque == controlaEstoque)&&(identical(other.quantidade, quantidade) || other.quantidade == quantidade)&&(identical(other.estoqueMinimo, estoqueMinimo) || other.estoqueMinimo == estoqueMinimo)&&(identical(other.noCarrinho, noCarrinho) || other.noCarrinho == noCarrinho));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,casaId,nome,categoria,status,atualizadoEm,atualizadoPor);
+int get hashCode => Object.hash(runtimeType,id,casaId,nome,categoria,status,atualizadoEm,atualizadoPor,controlaEstoque,quantidade,estoqueMinimo,noCarrinho);
 
 @override
 String toString() {
-  return 'PantryItem(id: $id, casaId: $casaId, nome: $nome, categoria: $categoria, status: $status, atualizadoEm: $atualizadoEm, atualizadoPor: $atualizadoPor)';
+  return 'PantryItem(id: $id, casaId: $casaId, nome: $nome, categoria: $categoria, status: $status, atualizadoEm: $atualizadoEm, atualizadoPor: $atualizadoPor, controlaEstoque: $controlaEstoque, quantidade: $quantidade, estoqueMinimo: $estoqueMinimo, noCarrinho: $noCarrinho)';
 }
 
 
@@ -48,7 +54,7 @@ abstract mixin class $PantryItemCopyWith<$Res>  {
   factory $PantryItemCopyWith(PantryItem value, $Res Function(PantryItem) _then) = _$PantryItemCopyWithImpl;
 @useResult
 $Res call({
- String id, String casaId, String nome, String categoria, ItemStatus status,@_TimestampConverter() DateTime atualizadoEm, String atualizadoPor
+ String id, String casaId, String nome, String categoria, ItemStatus status,@_TimestampConverter() DateTime atualizadoEm, String atualizadoPor, bool controlaEstoque, int? quantidade, int? estoqueMinimo, bool noCarrinho
 });
 
 
@@ -65,7 +71,7 @@ class _$PantryItemCopyWithImpl<$Res>
 
 /// Create a copy of PantryItem
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? casaId = null,Object? nome = null,Object? categoria = null,Object? status = null,Object? atualizadoEm = null,Object? atualizadoPor = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? casaId = null,Object? nome = null,Object? categoria = null,Object? status = null,Object? atualizadoEm = null,Object? atualizadoPor = null,Object? controlaEstoque = null,Object? quantidade = freezed,Object? estoqueMinimo = freezed,Object? noCarrinho = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,casaId: null == casaId ? _self.casaId : casaId // ignore: cast_nullable_to_non_nullable
@@ -74,7 +80,11 @@ as String,categoria: null == categoria ? _self.categoria : categoria // ignore: 
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as ItemStatus,atualizadoEm: null == atualizadoEm ? _self.atualizadoEm : atualizadoEm // ignore: cast_nullable_to_non_nullable
 as DateTime,atualizadoPor: null == atualizadoPor ? _self.atualizadoPor : atualizadoPor // ignore: cast_nullable_to_non_nullable
-as String,
+as String,controlaEstoque: null == controlaEstoque ? _self.controlaEstoque : controlaEstoque // ignore: cast_nullable_to_non_nullable
+as bool,quantidade: freezed == quantidade ? _self.quantidade : quantidade // ignore: cast_nullable_to_non_nullable
+as int?,estoqueMinimo: freezed == estoqueMinimo ? _self.estoqueMinimo : estoqueMinimo // ignore: cast_nullable_to_non_nullable
+as int?,noCarrinho: null == noCarrinho ? _self.noCarrinho : noCarrinho // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -159,10 +169,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor,  bool controlaEstoque,  int? quantidade,  int? estoqueMinimo,  bool noCarrinho)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PantryItem() when $default != null:
-return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor);case _:
+return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor,_that.controlaEstoque,_that.quantidade,_that.estoqueMinimo,_that.noCarrinho);case _:
   return orElse();
 
 }
@@ -180,10 +190,10 @@ return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor,  bool controlaEstoque,  int? quantidade,  int? estoqueMinimo,  bool noCarrinho)  $default,) {final _that = this;
 switch (_that) {
 case _PantryItem():
-return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor);case _:
+return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor,_that.controlaEstoque,_that.quantidade,_that.estoqueMinimo,_that.noCarrinho);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -200,10 +210,10 @@ return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String casaId,  String nome,  String categoria,  ItemStatus status, @_TimestampConverter()  DateTime atualizadoEm,  String atualizadoPor,  bool controlaEstoque,  int? quantidade,  int? estoqueMinimo,  bool noCarrinho)?  $default,) {final _that = this;
 switch (_that) {
 case _PantryItem() when $default != null:
-return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor);case _:
+return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_that.atualizadoEm,_that.atualizadoPor,_that.controlaEstoque,_that.quantidade,_that.estoqueMinimo,_that.noCarrinho);case _:
   return null;
 
 }
@@ -214,8 +224,8 @@ return $default(_that.id,_that.casaId,_that.nome,_that.categoria,_that.status,_t
 /// @nodoc
 @JsonSerializable()
 
-class _PantryItem implements PantryItem {
-  const _PantryItem({required this.id, required this.casaId, required this.nome, required this.categoria, required this.status, @_TimestampConverter() required this.atualizadoEm, required this.atualizadoPor});
+class _PantryItem extends PantryItem {
+  const _PantryItem({required this.id, required this.casaId, required this.nome, required this.categoria, required this.status, @_TimestampConverter() required this.atualizadoEm, required this.atualizadoPor, this.controlaEstoque = false, this.quantidade, this.estoqueMinimo, this.noCarrinho = false}): super._();
   factory _PantryItem.fromJson(Map<String, dynamic> json) => _$PantryItemFromJson(json);
 
 @override final  String id;
@@ -225,6 +235,16 @@ class _PantryItem implements PantryItem {
 @override final  ItemStatus status;
 @override@_TimestampConverter() final  DateTime atualizadoEm;
 @override final  String atualizadoPor;
+// ---- optional quantity + minimum-stock control (opt-in, default off) ----
+// When `controlaEstoque` is true, `status` is DERIVED from
+// quantidade <= estoqueMinimo (=> naoTem, else tem) and is never marked
+// manually; the shopping-cart state is carried by `noCarrinho` instead of
+// the status enum. When false (or absent, for pre-existing items) the item
+// behaves EXACTLY as before: manual 3-value `status`, cart = noCarrinho.
+@override@JsonKey() final  bool controlaEstoque;
+@override final  int? quantidade;
+@override final  int? estoqueMinimo;
+@override@JsonKey() final  bool noCarrinho;
 
 /// Create a copy of PantryItem
 /// with the given fields replaced by the non-null parameter values.
@@ -239,16 +259,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PantryItem&&(identical(other.id, id) || other.id == id)&&(identical(other.casaId, casaId) || other.casaId == casaId)&&(identical(other.nome, nome) || other.nome == nome)&&(identical(other.categoria, categoria) || other.categoria == categoria)&&(identical(other.status, status) || other.status == status)&&(identical(other.atualizadoEm, atualizadoEm) || other.atualizadoEm == atualizadoEm)&&(identical(other.atualizadoPor, atualizadoPor) || other.atualizadoPor == atualizadoPor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PantryItem&&(identical(other.id, id) || other.id == id)&&(identical(other.casaId, casaId) || other.casaId == casaId)&&(identical(other.nome, nome) || other.nome == nome)&&(identical(other.categoria, categoria) || other.categoria == categoria)&&(identical(other.status, status) || other.status == status)&&(identical(other.atualizadoEm, atualizadoEm) || other.atualizadoEm == atualizadoEm)&&(identical(other.atualizadoPor, atualizadoPor) || other.atualizadoPor == atualizadoPor)&&(identical(other.controlaEstoque, controlaEstoque) || other.controlaEstoque == controlaEstoque)&&(identical(other.quantidade, quantidade) || other.quantidade == quantidade)&&(identical(other.estoqueMinimo, estoqueMinimo) || other.estoqueMinimo == estoqueMinimo)&&(identical(other.noCarrinho, noCarrinho) || other.noCarrinho == noCarrinho));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,casaId,nome,categoria,status,atualizadoEm,atualizadoPor);
+int get hashCode => Object.hash(runtimeType,id,casaId,nome,categoria,status,atualizadoEm,atualizadoPor,controlaEstoque,quantidade,estoqueMinimo,noCarrinho);
 
 @override
 String toString() {
-  return 'PantryItem(id: $id, casaId: $casaId, nome: $nome, categoria: $categoria, status: $status, atualizadoEm: $atualizadoEm, atualizadoPor: $atualizadoPor)';
+  return 'PantryItem(id: $id, casaId: $casaId, nome: $nome, categoria: $categoria, status: $status, atualizadoEm: $atualizadoEm, atualizadoPor: $atualizadoPor, controlaEstoque: $controlaEstoque, quantidade: $quantidade, estoqueMinimo: $estoqueMinimo, noCarrinho: $noCarrinho)';
 }
 
 
@@ -259,7 +279,7 @@ abstract mixin class _$PantryItemCopyWith<$Res> implements $PantryItemCopyWith<$
   factory _$PantryItemCopyWith(_PantryItem value, $Res Function(_PantryItem) _then) = __$PantryItemCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String casaId, String nome, String categoria, ItemStatus status,@_TimestampConverter() DateTime atualizadoEm, String atualizadoPor
+ String id, String casaId, String nome, String categoria, ItemStatus status,@_TimestampConverter() DateTime atualizadoEm, String atualizadoPor, bool controlaEstoque, int? quantidade, int? estoqueMinimo, bool noCarrinho
 });
 
 
@@ -276,7 +296,7 @@ class __$PantryItemCopyWithImpl<$Res>
 
 /// Create a copy of PantryItem
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? casaId = null,Object? nome = null,Object? categoria = null,Object? status = null,Object? atualizadoEm = null,Object? atualizadoPor = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? casaId = null,Object? nome = null,Object? categoria = null,Object? status = null,Object? atualizadoEm = null,Object? atualizadoPor = null,Object? controlaEstoque = null,Object? quantidade = freezed,Object? estoqueMinimo = freezed,Object? noCarrinho = null,}) {
   return _then(_PantryItem(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,casaId: null == casaId ? _self.casaId : casaId // ignore: cast_nullable_to_non_nullable
@@ -285,7 +305,11 @@ as String,categoria: null == categoria ? _self.categoria : categoria // ignore: 
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as ItemStatus,atualizadoEm: null == atualizadoEm ? _self.atualizadoEm : atualizadoEm // ignore: cast_nullable_to_non_nullable
 as DateTime,atualizadoPor: null == atualizadoPor ? _self.atualizadoPor : atualizadoPor // ignore: cast_nullable_to_non_nullable
-as String,
+as String,controlaEstoque: null == controlaEstoque ? _self.controlaEstoque : controlaEstoque // ignore: cast_nullable_to_non_nullable
+as bool,quantidade: freezed == quantidade ? _self.quantidade : quantidade // ignore: cast_nullable_to_non_nullable
+as int?,estoqueMinimo: freezed == estoqueMinimo ? _self.estoqueMinimo : estoqueMinimo // ignore: cast_nullable_to_non_nullable
+as int?,noCarrinho: null == noCarrinho ? _self.noCarrinho : noCarrinho // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

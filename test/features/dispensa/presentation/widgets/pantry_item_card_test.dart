@@ -14,6 +14,7 @@ import 'package:domo/features/dispensa/presentation/widgets/pantry_item_card.dar
 /// with the right params", not an integration test of the whole stack.
 class _RecordingDispensaController extends DispensaController {
   final calls = <({String casaId, String itemId, ItemStatus statusAnterior, ItemStatus novoStatus})>[];
+  final quantidadeCalls = <({String casaId, String itemId, int quantidade, int estoqueMinimo})>[];
 
   @override
   FutureOr<void> build() {}
@@ -32,6 +33,21 @@ class _RecordingDispensaController extends DispensaController {
       novoStatus: novoStatus,
     ));
   }
+
+  @override
+  Future<void> atualizarQuantidade({
+    required String casaId,
+    required String itemId,
+    required int quantidade,
+    required int estoqueMinimo,
+  }) async {
+    quantidadeCalls.add((
+      casaId: casaId,
+      itemId: itemId,
+      quantidade: quantidade,
+      estoqueMinimo: estoqueMinimo,
+    ));
+  }
 }
 
 PantryItem _item({required ItemStatus status}) => PantryItem(
@@ -42,6 +58,23 @@ PantryItem _item({required ItemStatus status}) => PantryItem(
       status: status,
       atualizadoEm: DateTime(2026, 1, 1),
       atualizadoPor: 'u1',
+    );
+
+PantryItem _itemComEstoque({
+  required int quantidade,
+  required int estoqueMinimo,
+}) =>
+    PantryItem(
+      id: 'item1',
+      casaId: 'casa1',
+      nome: 'Leite integral',
+      categoria: 'Laticínios',
+      status: PantryItem.statusPorQuantidade(quantidade, estoqueMinimo),
+      atualizadoEm: DateTime(2026, 1, 1),
+      atualizadoPor: 'u1',
+      controlaEstoque: true,
+      quantidade: quantidade,
+      estoqueMinimo: estoqueMinimo,
     );
 
 Future<void> _pumpCard(
@@ -168,5 +201,89 @@ void main() {
     expect(controller.calls.single.statusAnterior, ItemStatus.tem);
     expect(controller.calls.single.novoStatus, ItemStatus.naoTem);
     expect(tapped, isFalse);
+  });
+
+  group('item com controle de quantidade (ON-mode)', () {
+    testWidgets(
+        'mostra quantidade e estoque mínimo em vez do chip de status manual',
+        (tester) async {
+      await _pumpCard(
+        tester,
+        item: _itemComEstoque(quantidade: 3, estoqueMinimo: 2),
+        controller: _RecordingDispensaController(),
+      );
+
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('mín 2'), findsOneWidget);
+      // Não deve haver zona de toggle manual de status para um item ON.
+      expect(find.byKey(const ValueKey('status-toggle-item1')), findsNothing);
+      expect(find.byKey(const ValueKey('quantity-zone-item1')), findsOneWidget);
+    });
+
+    testWidgets('tocar em "+" chama atualizarQuantidade com quantidade+1',
+        (tester) async {
+      final controller = _RecordingDispensaController();
+      await _pumpCard(
+        tester,
+        item: _itemComEstoque(quantidade: 3, estoqueMinimo: 2),
+        controller: controller,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('quantity-plus-item1')));
+      await tester.pump();
+
+      expect(controller.quantidadeCalls, hasLength(1));
+      final call = controller.quantidadeCalls.single;
+      expect(call.casaId, 'casa1');
+      expect(call.itemId, 'item1');
+      expect(call.quantidade, 4);
+      expect(call.estoqueMinimo, 2);
+    });
+
+    testWidgets('tocar em "-" chama atualizarQuantidade com quantidade-1',
+        (tester) async {
+      final controller = _RecordingDispensaController();
+      await _pumpCard(
+        tester,
+        item: _itemComEstoque(quantidade: 3, estoqueMinimo: 2),
+        controller: controller,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('quantity-minus-item1')));
+      await tester.pump();
+
+      expect(controller.quantidadeCalls, hasLength(1));
+      expect(controller.quantidadeCalls.single.quantidade, 2);
+    });
+
+    testWidgets('não deixa a quantidade cair abaixo de zero', (tester) async {
+      final controller = _RecordingDispensaController();
+      await _pumpCard(
+        tester,
+        item: _itemComEstoque(quantidade: 0, estoqueMinimo: 1),
+        controller: controller,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('quantity-minus-item1')));
+      await tester.pump();
+
+      expect(controller.quantidadeCalls, isEmpty);
+    });
+
+    testWidgets('tocar no corpo do card ainda abre a edição (onTap)',
+        (tester) async {
+      var tapped = false;
+      await _pumpCard(
+        tester,
+        item: _itemComEstoque(quantidade: 3, estoqueMinimo: 2),
+        controller: _RecordingDispensaController(),
+        onTap: () => tapped = true,
+      );
+
+      await tester.tap(find.text('Leite integral'));
+      await tester.pump();
+
+      expect(tapped, isTrue);
+    });
   });
 }
