@@ -7,6 +7,7 @@ import 'package:domo/features/casa/presentation/providers/casa_provider.dart';
 import 'package:domo/features/dispensa/domain/models/pantry_item.dart';
 import 'package:domo/features/dispensa/presentation/pages/dispensa_page.dart';
 import 'package:domo/features/dispensa/presentation/providers/dispensa_provider.dart';
+import 'package:domo/l10n/app_localizations.dart';
 
 final _casa = CasaModel(
   id: 'casa1',
@@ -26,7 +27,12 @@ void main() {
           itensProvider(_casa.id)
               .overrideWith((ref) => Stream.value(<PantryItem>[])),
         ],
-        child: const MaterialApp(home: DispensaPage()),
+        child: const MaterialApp(
+          locale: Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DispensaPage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -54,7 +60,12 @@ void main() {
           casaDoUsuarioProvider.overrideWith((ref) => Stream.value(_casa)),
           itensProvider(_casa.id).overrideWith((ref) => Stream.value([item])),
         ],
-        child: const MaterialApp(home: DispensaPage()),
+        child: const MaterialApp(
+          locale: Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DispensaPage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -71,7 +82,12 @@ void main() {
           itensProvider(_casa.id)
               .overrideWith((ref) => Stream.value(<PantryItem>[])),
         ],
-        child: const MaterialApp(home: DispensaPage()),
+        child: const MaterialApp(
+          locale: Locale('pt'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DispensaPage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();

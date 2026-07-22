@@ -9,6 +9,7 @@ import 'package:domo/features/dispensa/domain/models/pantry_item.dart';
 import 'package:domo/features/dispensa/domain/repositories/dispensa_repository.dart';
 import 'package:domo/features/dispensa/presentation/providers/dispensa_provider.dart';
 import 'package:domo/features/dispensa/presentation/widgets/add_edit_item_sheet.dart';
+import 'package:domo/l10n/app_localizations.dart';
 
 class _MockUser extends Mock implements User {}
 
@@ -155,6 +156,9 @@ Future<_FakeDispensaRepository> _pumpSheet(
         authStateProvider.overrideWith((ref) => Stream.value(user)),
       ],
       child: MaterialApp(
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           // `authStateProvider` is only ever `ref.read` inside `_save()`
           // (never `ref.watch` by the sheet itself), so nothing forces the

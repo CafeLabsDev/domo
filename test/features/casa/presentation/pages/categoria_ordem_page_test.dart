@@ -6,6 +6,7 @@ import 'package:domo/features/casa/domain/models/casa_model.dart';
 import 'package:domo/features/casa/domain/models/membro_model.dart';
 import 'package:domo/features/casa/domain/repositories/casa_repository.dart';
 import 'package:domo/features/casa/presentation/pages/categoria_ordem_page.dart';
+import 'package:domo/l10n/app_localizations.dart';
 import 'package:domo/features/casa/presentation/providers/casa_provider.dart';
 import 'package:domo/features/dispensa/domain/constants.dart';
 
@@ -99,7 +100,12 @@ Future<_FakeCasaRepository> _pumpPage(
         ),
         casaRepositoryProvider.overrideWith((ref) => repo),
       ],
-      child: const MaterialApp(home: CategoriaOrdemPage()),
+      child: const MaterialApp(
+        locale: Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: CategoriaOrdemPage(),
+      ),
     ),
   );
   await tester.pumpAndSettle();

@@ -10,6 +10,7 @@ import 'package:domo/features/dispensa/domain/models/pantry_item.dart';
 import 'package:domo/features/dispensa/presentation/providers/dispensa_controller.dart';
 import 'package:domo/features/dispensa/presentation/providers/dispensa_provider.dart';
 import 'package:domo/features/mercado/presentation/pages/mercado_page.dart';
+import 'package:domo/l10n/app_localizations.dart';
 
 /// Records every mutating call instead of touching
 /// `dispensaRepositoryProvider`/`authStateProvider` — same pattern as
@@ -142,7 +143,12 @@ Future<_RecordedCalls> _pumpMercado(
           ),
         ),
       ],
-      child: const MaterialApp(home: MercadoPage()),
+      child: const MaterialApp(
+        locale: Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MercadoPage(),
+      ),
     ),
   );
   await tester.pumpAndSettle();

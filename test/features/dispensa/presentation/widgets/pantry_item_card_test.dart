@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:domo/features/dispensa/domain/models/pantry_item.dart';
 import 'package:domo/features/dispensa/presentation/providers/dispensa_controller.dart';
 import 'package:domo/features/dispensa/presentation/widgets/pantry_item_card.dart';
+import 'package:domo/l10n/app_localizations.dart';
 
 /// Records every `atualizarStatus` call instead of touching
 /// `dispensaRepositoryProvider`/`authStateProvider` — keeps this a pure
@@ -90,6 +91,9 @@ Future<void> _pumpCard(
         dispensaControllerProvider.overrideWith(() => controller),
       ],
       child: MaterialApp(
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: PantryItemCard(
             item: item,

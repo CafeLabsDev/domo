@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:domo/l10n/app_localizations.dart';
 import 'package:domo/shared/widgets/domo_error_state.dart';
 
 void main() {
@@ -8,6 +9,9 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: DomoErrorState(
             title: 'Não foi possível carregar sua dispensa.',
@@ -29,6 +33,9 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: DomoErrorState(
             title: 'Erro',
@@ -47,6 +54,9 @@ void main() {
     var retried = false;
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('pt'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: DomoErrorState(
             title: 'Erro',
