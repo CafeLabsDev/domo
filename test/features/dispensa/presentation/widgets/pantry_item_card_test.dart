@@ -139,4 +139,34 @@ void main() {
     expect(tapped, isTrue);
     expect(controller.calls, isEmpty);
   });
+
+  testWidgets(
+      'tocar perto da borda da zona de status (não em cima do texto) ainda '
+      'chama atualizarStatus, não o onTap de editar — regressão do bug real '
+      'reportado (zona de toque pequena demais fazia cair no edit)',
+      (tester) async {
+    var tapped = false;
+    final controller = _RecordingDispensaController();
+    await _pumpCard(
+      tester,
+      item: _item(status: ItemStatus.tem),
+      controller: controller,
+      onTap: () => tapped = true,
+    );
+
+    final zoneFinder = find.byKey(const ValueKey('status-toggle-item1'));
+    final zoneRect = tester.getRect(zoneFinder);
+    // Centro vertical (dentro do Material, que só exclui 8px de padding em
+    // cima/embaixo), 8px da borda esquerda — dentro da zona clicável, mas
+    // fora do texto "Temos", que fica centralizado horizontalmente.
+    await tester.tapAt(
+      zoneRect.topLeft + Offset(8, zoneRect.height / 2),
+    );
+    await tester.pump();
+
+    expect(controller.calls, hasLength(1));
+    expect(controller.calls.single.statusAnterior, ItemStatus.tem);
+    expect(controller.calls.single.novoStatus, ItemStatus.naoTem);
+    expect(tapped, isFalse);
+  });
 }

@@ -54,39 +54,58 @@ class PantryItemCard extends ConsumerWidget {
         ),
       ),
       onDismissed: (_) => onDismiss(),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              _StatusDot(status: item.status),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.nome,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: isTem
-                        ? theme.colorScheme.onSurface.withValues(alpha: 0.45)
-                        : null,
-                    decoration: isTem ? TextDecoration.lineThrough : null,
+      // Two independent tap zones side by side, not one big InkWell with a
+      // tiny GestureDetector nested inside it — the old layout made the
+      // status chip's hit area much smaller than the row's, so a tap aimed
+      // at the chip regularly landed on the row's onTap (edit) instead. See
+      // docs/DESIGN.md for the before/after on this.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      _StatusDot(status: item.status),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item.nome,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: isTem
+                                ? theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.45)
+                                : null,
+                            decoration:
+                                isTem ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _StatusChip(
-                status: item.status,
-                onTap: () => controller.atualizarStatus(
-                  casaId: item.casaId,
-                  itemId: item.id,
-                  statusAnterior: item.status,
-                  novoStatus: item.status == ItemStatus.tem
-                      ? ItemStatus.naoTem
-                      : ItemStatus.tem,
-                ),
+            ),
+            _StatusToggleZone(
+              key: ValueKey('status-toggle-${item.id}'),
+              status: item.status,
+              onTap: () => controller.atualizarStatus(
+                casaId: item.casaId,
+                itemId: item.id,
+                statusAnterior: item.status,
+                novoStatus: item.status == ItemStatus.tem
+                    ? ItemStatus.naoTem
+                    : ItemStatus.tem,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -115,16 +134,20 @@ class _StatusDot extends StatelessWidget {
   }
 }
 
-/// Everyday tonal chip — recolored per docs/DESIGN.md §1.1/§4.1 to fix a
-/// real contrast bug: the previous implementation rendered the saturated
-/// status color as text directly over that *same* color at 12–15% alpha,
-/// which lands at 3.6–4.4:1 (below the 4.5:1 a ~12px label needs). Fixed by
-/// using a dedicated container/on-container hex pair per status (same
-/// recipe as `primaryContainer`/`tertiaryContainer`), landing 9–11:1.
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status, required this.onTap});
+/// The status toggle's own tap zone — a fixed-width column next to the name
+/// zone, not a small label floating inside the row's InkWell. Colored per
+/// docs/DESIGN.md §1.1/§4.1 to fix a real contrast bug: the previous
+/// implementation rendered the saturated status color as text directly over
+/// that *same* color at 12–15% alpha, which lands at 3.6–4.4:1 (below the
+/// 4.5:1 a ~12px label needs). Fixed by using a dedicated container/
+/// on-container hex pair per status (same recipe as
+/// `primaryContainer`/`tertiaryContainer`), landing 9–11:1.
+class _StatusToggleZone extends StatelessWidget {
+  const _StatusToggleZone({super.key, required this.status, required this.onTap});
   final ItemStatus status;
   final VoidCallback onTap;
+
+  static const _width = 84.0;
 
   @override
   Widget build(BuildContext context) {
@@ -158,21 +181,27 @@ class _StatusChip extends StatelessWidget {
             ),
     };
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8).copyWith(right: 16),
+      child: SizedBox(
+        width: _width,
+        child: Material(
           color: bgColor,
           // Squared-off "label tag" shape, not a full pill — docs/DESIGN.md
           // §3: the single biggest tactile differentiator from Dindin.
           borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
-        ),
-        child: Text(
-          status.label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: textColor,
-            letterSpacing: 0.2,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+            child: Center(
+              child: Text(
+                status.label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: textColor,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
           ),
         ),
       ),
