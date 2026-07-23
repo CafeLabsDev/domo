@@ -1,3 +1,5 @@
+**[Leia em Português](DESIGN.pt-br.md)**
+
 # Domo — Identity refactor & core-screen UX spec ("Armário Aberto")
 
 Status: approved direction, ready for implementation by the mobile specialist.

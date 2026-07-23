@@ -1,3 +1,5 @@
+**[Leia em Português](DEPLOY.pt-br.md)**
+
 # Deploy, CI, and rollback
 
 Operational guide for a solo maintainer running/debugging Domo's deploy

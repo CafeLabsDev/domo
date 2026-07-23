@@ -1,3 +1,5 @@
+**[Leia em Português](BACKEND.pt-br.md)**
+
 # Backend / security notes (Domo)
 
 Operational reference for Domo's Firestore backend. Read this before any deploy
