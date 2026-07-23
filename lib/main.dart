@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/analytics/analytics_service.dart';
+import 'core/providers/locale_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -33,10 +34,11 @@ class DomoApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
-      // pt as the default/fallback locale (no explicit `locale:` override):
-      // the product is Portuguese-first, matching the rest of the UI copy —
-      // English is opt-in via the device's system language, not the app's
-      // own default.
+      // localeProvider is null by default ("follow system") — pt is what
+      // AppLocalizations falls back to when the system locale isn't
+      // supported (see l10n.yaml), matching the product's Portuguese-first
+      // copy. An explicit choice from the Profile screen overrides this.
+      locale: ref.watch(localeProvider),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

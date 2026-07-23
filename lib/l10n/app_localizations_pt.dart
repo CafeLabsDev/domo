@@ -388,6 +388,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get lightTheme => 'Claro';
 
   @override
+  String get languageSection => 'Idioma';
+
+  @override
+  String get languageSystemOption => 'Sistema';
+
+  @override
   String get darkTheme => 'Escuro';
 
   @override

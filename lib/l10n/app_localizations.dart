@@ -788,6 +788,18 @@ abstract class AppLocalizations {
   /// **'Claro'**
   String get lightTheme;
 
+  /// No description provided for @languageSection.
+  ///
+  /// In pt, this message translates to:
+  /// **'Idioma'**
+  String get languageSection;
+
+  /// No description provided for @languageSystemOption.
+  ///
+  /// In pt, this message translates to:
+  /// **'Sistema'**
+  String get languageSystemOption;
+
   /// No description provided for @darkTheme.
   ///
   /// In pt, this message translates to:

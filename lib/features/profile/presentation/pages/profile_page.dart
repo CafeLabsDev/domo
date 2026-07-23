@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/providers/locale_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -184,6 +185,40 @@ class _ProfileContent extends ConsumerWidget {
                     selected: {ref.watch(themeModeProvider)},
                     onSelectionChanged: (set) {
                       ref.read(themeModeProvider.notifier).state = set.first;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            _SectionLabel(l10n.languageSection, theme),
+            _CardSection(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md,
+                  ),
+                  child: SegmentedButton<Locale?>(
+                    segments: [
+                      ButtonSegment(
+                        value: null,
+                        icon: const Icon(Icons.brightness_auto_outlined),
+                        label: Text(l10n.languageSystemOption),
+                      ),
+                      const ButtonSegment(
+                        value: Locale('pt'),
+                        label: Text('Português'),
+                      ),
+                      const ButtonSegment(
+                        value: Locale('en'),
+                        label: Text('English'),
+                      ),
+                    ],
+                    selected: {ref.watch(localeProvider)},
+                    onSelectionChanged: (set) {
+                      ref.read(localeProvider.notifier).state = set.first;
                     },
                   ),
                 ),

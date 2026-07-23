@@ -147,6 +147,8 @@
   "appearanceSection": "Appearance",
   "systemTheme": "System",
   "lightTheme": "Light",
+  "languageSection": "Language",
+  "languageSystemOption": "System",
   "darkTheme": "Dark",
   "accountSection": "Account",
   "signOut": "Sign out",
