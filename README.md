@@ -1,54 +1,57 @@
+**[Leia em Português](README.pt-br.md)**
+
 # Domo
 
-Um produto [Café Labs](https://cafelabs.net).
+A [Café Labs](https://cafelabs.net) product.
 
-App de gestão doméstica para famílias e grupos — Android e Web.
+Household management app for families and groups — Android and Web.
 
-## Funcionalidades
+## Features
 
-- **Autenticação** — e-mail/senha e Google Sign-In
-- **Casa** — criar casa, entrar por código de 6 caracteres, gerenciar membros (aprovar, recusar, remover, definir cargo), sair ou deletar a casa; qualquer membro ativo pode reordenar as categorias da dispensa da casa (`/casa/categorias`)
-- **Dispensa** — cadastro de itens por categoria com 3 status: *Tem*, *Em falta*, *No carrinho*; opcionalmente, por item, controle de quantidade + estoque mínimo (o status passa a ser calculado automaticamente a partir desses números, em vez de alternado manualmente)
-- **Lista de Compras** — view filtrada da dispensa; marcar itens no carrinho e atualizar a dispensa em lote
-- **Perfil** — foto Google, cargo na casa, toggle de tema (Sistema / Claro / Escuro), logout
+- **Authentication** — email/password and Google Sign-In
+- **Household** — create a household, join via a 6-character code, manage members (approve, reject, remove, set role), leave or delete the household; any active member can reorder the pantry categories for the household (`/casa/categorias`)
+- **Pantry** — items registered by category with 3 statuses: *Have*, *Out*, *In cart*; optionally, per item, quantity + minimum stock tracking (status is then computed automatically from those numbers instead of being toggled manually)
+- **Shopping List** — filtered view of the pantry; mark items as in cart and batch-update the pantry
+- **Profile** — Google photo, household role, theme toggle (System / Light / Dark), language selector (System / Português / English), logout
 
 ---
 
 ## Stack
 
-| Camada | Pacote |
+| Layer | Package |
 |---|---|
 | State Management | `flutter_riverpod ^2.6.1` + `riverpod_generator` |
-| Navegação | `go_router ^14.8.1` |
+| Navigation | `go_router ^14.8.1` |
 | Backend | Firebase Auth + Cloud Firestore |
-| Auth social | `google_sign_in ^6.2.0` |
-| Modelos | `freezed ^3.0.0` + `json_serializable` |
-| Analytics | `firebase_analytics ^11.4.4` (6 eventos mínimos, sem PII — ver `docs/ARQUITETURA.md`) |
-| Imagens | `cached_network_image ^3.4.1` |
+| Social auth | `google_sign_in ^6.2.0` |
+| Models | `freezed ^3.0.0` + `json_serializable` |
+| Analytics | `firebase_analytics ^11.4.4` (6 minimal events, no PII — see `docs/ARQUITETURA.md`) |
+| Images | `cached_network_image ^3.4.1` |
 | SVG | `flutter_svg ^2.0.10` |
-| Fonte | Google Fonts — Bitter (headings) + Manrope (corpo/UI), buscadas dinamicamente em runtime |
+| Font | Google Fonts — Bitter (headings) + Manrope (body/UI), fetched dynamically at runtime |
+| i18n | `flutter_localizations` + ARB (PT template, EN) |
 
 ---
 
-## Pré-requisitos
+## Prerequisites
 
-- Flutter `^3.27` / Dart `^3.6` instalado em `/home/<user>/flutter/bin/`
-- Node.js (para `firebase` CLI, opcional)
-- Conta Firebase com projeto configurado
+- Flutter `^3.27` / Dart `^3.6` installed at `/home/<user>/flutter/bin/`
+- Node.js (for the `firebase` CLI, optional)
+- Firebase account with a configured project
 
-> **WSL2:** Flutter pode travar em loop de `git fetch`. Use `dart` diretamente para
-> `build_runner` e `flutter_launcher_icons` (ex: `dart run build_runner build`).
-> Se o loop persistir, rode:
+> **WSL2:** Flutter can get stuck in a `git fetch` loop. Use `dart` directly for
+> `build_runner` and `flutter_launcher_icons` (e.g. `dart run build_runner build`).
+> If the loop persists, run:
 > ```bash
 > git config --global url."https://".insteadOf git://
 > ```
 
 ---
 
-## Como rodar
+## Running
 
 ```bash
-# 1. Dependências
+# 1. Dependencies
 flutter pub get
 
 # 2. Codegen (freezed + riverpod + json_serializable)
@@ -63,7 +66,7 @@ flutter run -d chrome
 
 ---
 
-## Build de produção
+## Production build
 
 ```bash
 # Android (APK)
@@ -78,56 +81,56 @@ flutter build web --release
 
 ---
 
-## Ícone do app
+## App icon
 
-Configurado via `flutter_launcher_icons`. Para regenerar após trocar os assets:
+Configured via `flutter_launcher_icons`. To regenerate after changing assets:
 
 ```bash
 dart run flutter_launcher_icons
 ```
 
-Assets em `assets/icons/`:
-- `icon.png` — 1024×1024, fundo `#EEF1F1` (web + legacy Android, tom "ceramic stone" da identidade Armário Aberto)
-- `icon_foreground.png` — 1024×1024, fundo transparente (Android adaptive)
-- `domo_icon.svg` — logo SVG (AppBar + favicon web), já recolorido para a paleta Azul Louça (`docs/DESIGN.md` §5)
+Assets in `assets/icons/`:
+- `icon.png` — 1024×1024, `#EEF1F1` background (web + legacy Android, the "ceramic stone" tone from the Armário Aberto identity)
+- `icon_foreground.png` — 1024×1024, transparent background (Android adaptive)
+- `domo_icon.svg` — SVG logo (AppBar + web favicon), already recolored for the Azul Louça palette (`docs/DESIGN.md` §5)
 
 ---
 
-## Arquitetura
+## Architecture
 
-**Feature-first + Clean Architecture** — cada feature em `lib/features/` tem
-suas próprias camadas `data` / `domain` / `presentation`; estado via Riverpod
-(code-gen), navegação via `go_router`.
+**Feature-first + Clean Architecture** — each feature under `lib/features/` has
+its own `data` / `domain` / `presentation` layers; state via Riverpod
+(code-gen), navigation via `go_router`.
 
 ```
 lib/
-├── core/          # analytics, constants, providers (tema), router, theme
-├── features/      # auth, casa, dispensa, mercado, profile
-└── shared/        # widgets reutilizados entre features (HomeShell, DomoErrorState...)
+├── core/          # analytics, constants, providers (theme), router, theme
+├── features/      # auth, casa (household), dispensa (pantry), mercado (shopping), profile
+└── shared/        # widgets shared across features (HomeShell, DomoErrorState...)
 ```
 
-Aprofundamento (camadas, padrões de provider, roteamento, decisões técnicas):
+Deeper dive (layers, provider patterns, routing, technical decisions):
 **`docs/ARQUITETURA.md`**.
 
 ---
 
-## Design e identidade visual
+## Design and visual identity
 
-Identidade **"Armário Aberto"** — paleta Azul Louça, tipografia Bitter
-(headings) + Manrope (corpo), Material Design 3 com suporte nativo a Light e
-Dark mode via `AppTheme.light` / `AppTheme.dark`. Tokens completos, contraste
-WCAG e rationale de cada decisão: **`docs/DESIGN.md`**.
+**"Armário Aberto"** ("Open Cabinet") identity — Azul Louça (ceramic blue) palette, Bitter
+(headings) + Manrope (body) typography, Material Design 3 with native Light and
+Dark mode support via `AppTheme.light` / `AppTheme.dark`. Full tokens, WCAG
+contrast, and the rationale behind each decision: **`docs/DESIGN.md`**.
 
 ---
 
-## Backend e dados
+## Backend and data
 
-Firebase Auth + Cloud Firestore. Modelo de dados, regras de segurança e o
-fluxo de convite por código: **`docs/BACKEND.md`**.
+Firebase Auth + Cloud Firestore. Data model, security rules, and the
+invite-by-code flow: **`docs/BACKEND.md`**.
 
 ---
 
 ## Deploy
 
-Firebase Hosting (`app.domo.cafelabs.net`), CI no GitHub Actions, deploy
-manual gated via `scripts/deploy.sh`: **`docs/DEPLOY.md`**.
+Firebase Hosting (`app.domo.cafelabs.net`), CI on GitHub Actions, gated manual
+deploy via `scripts/deploy.sh`: **`docs/DEPLOY.md`**.
