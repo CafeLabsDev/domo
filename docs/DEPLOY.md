@@ -20,7 +20,7 @@ Runs on every push to `master`. Two independent jobs, both on GitHub Actions'
 free tier (public/private repo, this volume of pushes — nowhere near the
 2,000 free minutes/month):
 
-- **`flutter`** — `flutter pub get && flutter analyze && flutter test` (57
+- **`flutter`** — `flutter pub get && flutter analyze && flutter test` (60
   tests).
 - **`rules`** — spins up the Firestore emulator (`firebase-tools
   emulators:exec`) and runs `test/rules/rules.test.mjs` against it (77 tests
@@ -38,7 +38,7 @@ unlike `CasaRepositoryImpl` (which also accepts an injectable `firestore`
 client), it always resolves `FirebaseFirestore.instance` internally. That
 means its write methods (`atualizarItem`, `atualizarQuantidade`,
 `atualizarDispensaEmLote`, etc.) can't be driven against
-`fake_cloud_firestore` the way `CasaRepositoryImpl`'s writes are — the 57
+`fake_cloud_firestore` the way `CasaRepositoryImpl`'s writes are — the 60
 Dart tests cover the dispensa domain/presentation layers and widget behavior,
 but not `DispensaRepositoryImpl`'s Firestore writes directly (those paths are
 only exercised indirectly, end-to-end, via the rules emulator suite and

@@ -35,7 +35,9 @@ App de gestão doméstica para famílias e grupos — Android e Web.
 
 ## Pré-requisitos
 
-- Flutter `^3.27` / Dart `^3.6` instalado em `/home/<user>/flutter/bin/`
+- Flutter com Dart SDK `^3.11.4` (conforme `pubspec.yaml`) — desenvolvido e
+  testado com Flutter `3.44.4` / Dart `3.12.2`, instalado em
+  `/home/<user>/flutter/bin/`
 - Node.js (para `firebase` CLI, opcional)
 - Conta Firebase com projeto configurado
 

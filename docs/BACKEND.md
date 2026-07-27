@@ -58,25 +58,38 @@ needed a backfill because the OLD join flow becomes unusable without it; these
 two features don't change any existing flow's behavior, they only add new
 opt-in ones.
 
-## Current state of rules found in production (as of this change)
+## Rules status: fixed and deployed (resolved as of the 2026-07-18 refactor cycle)
 
-**Could not read the live published ruleset** from this environment: the
-sandbox blocks access tokens (`gcloud auth print-access-token`,
-`firebase login:ci`), and firebase-tools has no first-party "get published
-rules" command, no cached ruleset in `.firebase/`, and there was never a
-`firestore` block in `firebase.json` — so nothing in this repo has ever
-deployed rules. Whatever is live was set by hand in the console.
+**Status: the new rules below ARE deployed to production** (`domo-8b336`),
+together with the three client co-changes described in "Required client
+co-change" below — see `mind/projetos/produtos-cafelabs/domo.md`. The
+paragraphs below describe the state found **at the start of that cycle,
+before the fix** — kept here as the historical record of why this was
+flagged urgent, not as the current state.
 
-**What the client code proves the live rules MUST currently allow — and why
-that is almost certainly wide open:** `CasaRepositoryImpl.entrarNaCasa` runs
-`casas.where('codigo', ==, X)` as a *non-member* and then writes itself into
-the house doc. For that to work today, the live rules must permit an arbitrary
-authenticated user to **query the whole `casas` collection** and **write to a
-house they don't belong to**. In practice that means the project is running on
-something at least as permissive as `allow read, write: if request.auth != null`
-(any signed-in user can read/write any house), possibly fully open. Treat
-production as effectively unprotected until the rules in this repo are reviewed
-and deployed. This is the reason the ticket was flagged urgent.
+**Original finding (pre-fix): could not read the live published ruleset**
+from the sandbox environment used for the audit: it blocks access tokens
+(`gcloud auth print-access-token`, `firebase login:ci`), and firebase-tools
+has no first-party "get published rules" command, no cached ruleset in
+`.firebase/`, and there was never a `firestore` block in `firebase.json` —
+so nothing in this repo had ever deployed rules up to that point. Whatever
+was live had been set by hand in the console.
+
+**What the client code proved the live rules MUST have allowed at the time —
+and why that was almost certainly wide open:** the pre-fix
+`CasaRepositoryImpl.entrarNaCasa` ran `casas.where('codigo', ==, X)` as a
+*non-member* and then wrote itself into the house doc. For that to have
+worked, the live rules had to permit an arbitrary authenticated user to
+**query the whole `casas` collection** and **write to a house they don't
+belong to** — i.e. something at least as permissive as
+`allow read, write: if request.auth != null`, possibly fully open. This is
+why the ticket was flagged urgent, and why the rules + client fix below were
+prioritized and shipped together.
+
+TODO: confirmar — this repo has no way to read the live ruleset id/timestamp
+from this sandbox either (same access-token limitation as above), so the
+exact deploy date isn't independently verifiable from here; going only by
+the project record in `mind/projetos/produtos-cafelabs/domo.md`.
 
 ## New security model (what `firestore.rules` here enforces)
 
@@ -190,29 +203,35 @@ this is available to any active member, not just the owner.
 
 ## Required client co-change: join-by-code (`codigos/{CODE}` lookup)
 
-The current join flow queries the whole `casas` collection by `codigo`. **That
+**Status: implemented and deployed** — all three edits below are live in
+`lib/features/casa/data/repositories/casa_repository_impl.dart` (verified by
+reading the file: `criarCasa` writes `codigos/{CODE}`, `entrarNaCasa` does a
+`get` by id, `deletarCasa` deletes the lookup doc). Kept here as the
+authoritative explanation of *why* the rules and the client are shaped this
+way, and as the checklist to re-verify if `firestore.rules` around `codigos`
+is ever touched again.
+
+The old join flow queried the whole `casas` collection by `codigo`. **That
 query cannot be secured** — Firestore rules cannot force a `where` clause, so
 allowing the query at all lets any signed-in user enumerate and read *every*
 house. The rules here therefore **deny** that query on purpose.
 
-The secure replacement (rules for it are already in `firestore.rules`) is
-**three edits to `CasaRepositoryImpl`**, all required, all shipped together:
+The secure replacement is **three edits to `CasaRepositoryImpl`**, all
+required, all shipped together:
 
-1. **`criarCasa`** (currently `casa_repository_impl.dart` ~L56-63): today it
-   writes ONLY `casas/{id}` and never touches `codigos`. Add a second write:
-   `codigos/{CODE} = { casaId, nome }`, AFTER the house doc exists (the rule's
-   ownership `get()` must see the committed house). `{CODE}` is the doc id.
-2. **`entrarNaCasa`** (currently ~L81-84, `casas.where('codigo', ==, X)`):
-   replace the collection query with `get codigos/{CODE}` → `casaId` (a get BY
-   ID — you must already know the 6-char code, no enumeration), then keep the
-   existing self-add-as-`pendente` update on `casas/{casaId}`.
-3. **`deletarCasa`** (currently ~L160-162, deletes only the house): also delete
-   `codigos/{CODE}` so codes don't dangle.
+1. **`criarCasa`**: writes `codigos/{CODE} = { casaId, nome }` AFTER the house
+   doc exists (the rule's ownership `get()` must see the committed house).
+   `{CODE}` is the doc id.
+2. **`entrarNaCasa`**: resolves the code via `get codigos/{CODE}` → `casaId`
+   (a get BY ID — you must already know the 6-char code, no enumeration),
+   then keeps the self-add-as-`pendente` update on `casas/{casaId}`.
+3. **`deletarCasa`**: also deletes `codigos/{CODE}` so codes don't dangle.
 
-Until all three land, join-by-code fails under the new rules — so rules + these
-three edits deploy together (see deploy gate step 2). The rules test suite
-covers the server side of all three (`codigos` create/delete owner-only,
-get-by-id resolve, list denied).
+Without all three, join-by-code fails under these rules — so if either the
+rules or the client repository is ever modified again, both must move
+together (see deploy gate step 2). The rules test suite covers the server
+side of all three (`codigos` create/delete owner-only, get-by-id resolve,
+list denied).
 
 ## Post-deploy smoke test (there is no staging)
 

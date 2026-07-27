@@ -67,29 +67,42 @@ duas: `codigos` precisou de backfill porque o fluxo de join ANTIGO fica
 inutilizável sem ele; essas duas features não mudam o comportamento de
 nenhum fluxo existente, elas só adicionam fluxos novos e opcionais.
 
-## Estado atual das regras encontrado em produção (no momento desta mudança)
+## Status das regras: corrigido e implantado (resolvido no ciclo de refactor de 2026-07-18)
 
-**Não foi possível ler o ruleset publicado em produção** a partir deste
-ambiente: o sandbox bloqueia access tokens (`gcloud auth print-access-token`,
-`firebase login:ci`), e o firebase-tools não tem nenhum comando first-party
-de "obter regras publicadas", nenhum ruleset em cache em `.firebase/`, e
-nunca existiu um bloco `firestore` em `firebase.json` — então nada neste
-repositório jamais fez deploy de regras. O que quer que esteja em produção
-foi configurado manualmente no console.
+**Status: as novas regras abaixo ESTÃO implantadas em produção**
+(`domo-8b336`), junto com as três co-mudanças de cliente descritas em
+"Co-mudança de cliente obrigatória" abaixo — ver
+`mind/projetos/produtos-cafelabs/domo.md`. Os parágrafos abaixo descrevem o
+estado encontrado **no início daquele ciclo, antes do fix** — mantidos aqui
+como o registro histórico de por que isso foi sinalizado como urgente, não
+como o estado atual.
 
-**O que o código do cliente prova que as regras em produção DEVEM
-atualmente permitir — e por que isso é quase certamente muito aberto:**
-`CasaRepositoryImpl.entrarNaCasa` roda `casas.where('codigo', ==, X)` como um
-*não membro* e depois escreve a si mesmo no doc da casa. Para isso funcionar
-hoje, as regras em produção devem permitir que um usuário autenticado
-arbitrário **consulte a coleção `casas` inteira** e **escreva em uma casa da
-qual não faz parte**. Na prática isso significa que o projeto está rodando
-em algo pelo menos tão permissivo quanto
-`allow read, write: if request.auth != null` (qualquer usuário logado pode
-ler/escrever em qualquer casa), possivelmente totalmente aberto. Trate a
-produção como efetivamente desprotegida até que as regras deste repositório
-sejam revisadas e implantadas. Esse é o motivo pelo qual o ticket foi
-sinalizado como urgente.
+**Achado original (pré-fix): não foi possível ler o ruleset publicado em
+produção** a partir do ambiente sandbox usado na auditoria: ele bloqueia
+access tokens (`gcloud auth print-access-token`, `firebase login:ci`), e o
+firebase-tools não tem nenhum comando first-party de "obter regras
+publicadas", nenhum ruleset em cache em `.firebase/`, e nunca existiu um
+bloco `firestore` em `firebase.json` — então nada neste repositório havia
+feito deploy de regras até aquele ponto. O que quer que estivesse em
+produção tinha sido configurado manualmente no console.
+
+**O que o código do cliente provava que as regras em produção DEVIAM
+permitir na época — e por que isso era quase certamente muito aberto:** o
+`CasaRepositoryImpl.entrarNaCasa` pré-fix rodava
+`casas.where('codigo', ==, X)` como um *não membro* e depois escrevia a si
+mesmo no doc da casa. Para isso funcionar, as regras em produção precisavam
+permitir que um usuário autenticado arbitrário **consultasse a coleção
+`casas` inteira** e **escrevesse em uma casa da qual não fazia parte** — ou
+seja, algo pelo menos tão permissivo quanto
+`allow read, write: if request.auth != null`, possivelmente totalmente
+aberto. É por isso que o ticket foi sinalizado como urgente, e por que as
+regras + o fix de cliente abaixo foram priorizados e enviados juntos.
+
+TODO: confirmar — este repositório também não tem como ler o id/timestamp do
+ruleset ao vivo a partir deste sandbox (mesma limitação de access token
+acima), então a data exata do deploy não é verificável de forma independente
+a partir daqui; baseado apenas no registro do projeto em
+`mind/projetos/produtos-cafelabs/domo.md`.
 
 ## Novo modelo de segurança (o que o `firestore.rules` daqui reforça)
 
@@ -213,34 +226,38 @@ ativo, não só o owner.
 
 ## Co-mudança de cliente obrigatória: join-por-código (lookup `codigos/{CODE}`)
 
-O fluxo de join atual consulta a coleção `casas` inteira por `codigo`.
+**Status: implementado e implantado** — as três edições abaixo estão vivas em
+`lib/features/casa/data/repositories/casa_repository_impl.dart` (verificado
+lendo o arquivo: `criarCasa` escreve `codigos/{CODE}`, `entrarNaCasa` faz um
+`get` por id, `deletarCasa` apaga o doc de lookup). Mantido aqui como a
+explicação autoritativa de *por que* as regras e o cliente têm esse formato,
+e como checklist para reverificar se `firestore.rules` em torno de `codigos`
+for mexido de novo no futuro.
+
+O fluxo de join antigo consultava a coleção `casas` inteira por `codigo`.
 **Essa query não pode ser protegida** — as regras do Firestore não podem
 forçar uma cláusula `where`, então permitir a query já deixa qualquer
 usuário logado enumerar e ler *toda* casa. As regras aqui, portanto,
 **negam** essa query de propósito.
 
-A substituição segura (as regras para ela já estão em `firestore.rules`) são
-**três edições em `CasaRepositoryImpl`**, todas obrigatórias, todas
-enviadas juntas:
+A substituição segura são **três edições em `CasaRepositoryImpl`**, todas
+obrigatórias, todas enviadas juntas:
 
-1. **`criarCasa`** (atualmente `casa_repository_impl.dart` ~L56-63): hoje
-   escreve SÓ `casas/{id}` e nunca toca em `codigos`. Adicione uma segunda
-   escrita: `codigos/{CODE} = { casaId, nome }`, DEPOIS do doc da casa
-   existir (o `get()` de ownership da regra precisa ver a casa já
+1. **`criarCasa`**: escreve `codigos/{CODE} = { casaId, nome }`, DEPOIS do
+   doc da casa existir (o `get()` de ownership da regra precisa ver a casa já
    commitada). `{CODE}` é o id do documento.
-2. **`entrarNaCasa`** (atualmente ~L81-84, `casas.where('codigo', ==, X)`):
-   substitua a query de coleção por um `get codigos/{CODE}` → `casaId` (um
-   get POR ID — você já precisa saber o código de 6 caracteres, sem
-   enumeração), depois mantenha o update existente de auto-adicionar-se
+2. **`entrarNaCasa`**: resolve o código via `get codigos/{CODE}` → `casaId`
+   (um get POR ID — você já precisa saber o código de 6 caracteres, sem
+   enumeração), depois mantém o update existente de auto-adicionar-se
    como `pendente` em `casas/{casaId}`.
-3. **`deletarCasa`** (atualmente ~L160-162, apaga só a casa): apague também
-   `codigos/{CODE}` para os códigos não ficarem soltos.
+3. **`deletarCasa`**: apaga também `codigos/{CODE}` para os códigos não
+   ficarem soltos.
 
-Até as três entrarem no ar, o join-por-código falha sob as novas regras —
-então regras + essas três edições vão juntas no deploy (ver passo 2 do gate
-de deploy). A suíte de testes de regras cobre o lado servidor das três
-(create/delete de `codigos` só pelo owner, resolução get-by-id, list
-negado).
+Sem as três, o join-por-código falha sob essas regras — então, se as regras
+ou o repositório de cliente forem modificados de novo no futuro, os dois
+precisam andar juntos (ver passo 2 do gate de deploy). A suíte de testes de
+regras cobre o lado servidor das três (create/delete de `codigos` só pelo
+owner, resolução get-by-id, list negado).
 
 ## Smoke test pós-deploy (não há staging)
 

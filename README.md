@@ -35,7 +35,8 @@ Household management app for families and groups — Android and Web.
 
 ## Prerequisites
 
-- Flutter `^3.27` / Dart `^3.6` installed at `/home/<user>/flutter/bin/`
+- Flutter with Dart SDK `^3.11.4` (per `pubspec.yaml`) — developed and tested
+  with Flutter `3.44.4` / Dart `3.12.2`, installed at `/home/<user>/flutter/bin/`
 - Node.js (for the `firebase` CLI, optional)
 - Firebase account with a configured project
 

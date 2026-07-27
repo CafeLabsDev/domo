@@ -20,7 +20,7 @@ Roda em todo push para `master`. Dois jobs independentes, ambos no tier
 gratuito do GitHub Actions (repositório público/privado, neste volume de
 pushes — bem longe dos 2.000 minutos grátis/mês):
 
-- **`flutter`** — `flutter pub get && flutter analyze && flutter test` (57
+- **`flutter`** — `flutter pub get && flutter analyze && flutter test` (60
   testes).
 - **`rules`** — sobe o emulador do Firestore (`firebase-tools
   emulators:exec`) e roda `test/rules/rules.test.mjs` contra ele (77 testes
@@ -40,7 +40,7 @@ client `firestore` injetável), ele sempre resolve `FirebaseFirestore.instance`
 internamente. Isso significa que seus métodos de escrita (`atualizarItem`,
 `atualizarQuantidade`, `atualizarDispensaEmLote`, etc.) não podem ser
 exercitados contra `fake_cloud_firestore` da mesma forma que as escritas de
-`CasaRepositoryImpl` são — os 57 testes Dart cobrem as camadas de
+`CasaRepositoryImpl` são — os 60 testes Dart cobrem as camadas de
 domain/presentation e o comportamento de widget da dispensa, mas não as
 escritas de `DispensaRepositoryImpl` no Firestore diretamente (esses
 caminhos só são exercitados indiretamente, ponta a ponta, via a suíte do

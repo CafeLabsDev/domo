@@ -25,3 +25,7 @@ deploy) vive em `README.md` e `docs/*.md` — comece por lá, não por aqui:
   build_runner build --delete-conflicting-outputs` antes de considerar a
   mudança completa — os `.g.dart`/`.freezed.dart` ficam desatualizados
   silenciosamente, sem erro de análise.
+- **Mudanças significativas futuras devem passar pelo Forge** (o time de
+  agentes especializados do repo `forge`) em vez de serem feitas ad-hoc por um
+  agente avulso — mantém a mesma qualidade/rigor de arquitetura, segurança e
+  documentação que já foi aplicada neste projeto.
