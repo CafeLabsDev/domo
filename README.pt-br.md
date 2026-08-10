@@ -50,6 +50,39 @@ App de gestão doméstica para famílias e grupos — Android e Web.
 
 ---
 
+## Configuração
+
+O Domo fala com um único projeto Firebase (`domo-8b336`, plano Spark/gratuito)
+tanto para Auth quanto Firestore. Diferente da maioria das stacks, a
+configuração de cliente do Firebase aqui **não é um segredo** — ela só
+identifica o projeto pro SDK do cliente; todo o controle de acesso de verdade
+é aplicado no servidor via `firestore.rules` (ver `docs/BACKEND.pt-br.md`) —
+então estes arquivos são commitados neste repositório em vez de estarem no
+gitignore:
+
+| Arquivo | Propósito | De onde vem |
+|---|---|---|
+| `lib/firebase_options.dart` | Configuração de cliente do Firebase (todas as plataformas), gerada pela CLI do FlutterFire | `flutterfire configure`, rodado uma vez contra o projeto Firebase `domo-8b336` |
+| `android/app/google-services.json` | Configuração do Firebase específica do Android | console do Firebase → Configurações do projeto → app Android, ou regenerado por `flutterfire configure` |
+| `.firebaserc` | Aponta a CLI `firebase` para o projeto `domo-8b336` por padrão | commitado, uma linha |
+| `firebase.json` | Caminhos de rules/indexes do Firestore, portas do emulador, config do Hosting | commitado |
+
+Para apontar este código pra um projeto Firebase **diferente** (ex.: um seu
+próprio pra experimentação local), rode `flutterfire configure` de novo — ele
+reescreve `firebase_options.dart` e `google-services.json` pro projeto que
+você selecionar.
+
+Existe um segredo de verdade, mas só pra um script opcional e pontual, nunca
+pra rodar o app em si: `scripts/backfill/backfill-codigos.mjs` (ver
+`scripts/backfill/README.md`) lê o **caminho** de uma chave de service account
+pela variável de ambiente `GOOGLE_APPLICATION_CREDENTIALS`. O arquivo da
+chave em si nunca deve ser commitado (o `.gitignore` bloqueia
+`*serviceAccount*.json` e padrões parecidos) — obtenha-a no console do
+Firebase → Configurações do projeto → Contas de serviço → Gerar nova chave
+privada, e mantenha-a fora do repositório.
+
+---
+
 ## Como rodar
 
 ```bash
@@ -65,6 +98,43 @@ flutter run -d android
 # 4. Web
 flutter run -d chrome
 ```
+
+---
+
+## Rodando a suíte de testes
+
+Duas suítes de teste independentes, sem depender uma da outra:
+
+**Testes unitários/widget do Flutter** (`test/`, exceto `test/rules/`) —
+mockam Firestore/Auth via `fake_cloud_firestore` + `mocktail`, sem precisar de
+emulador ou rede:
+
+```bash
+flutter test
+```
+
+**Testes de regras de segurança do Firestore** (`test/rules/`) — um harness
+Node autônomo com seu próprio `package.json` (fora da árvore de dependências
+do `pubspec.yaml`) que roda só contra o **emulador local do Firestore**, nunca
+produção:
+
+```bash
+cd test/rules
+npm install        # uma vez
+
+cd ../..            # volta pra raiz do repositório
+firebase emulators:exec --only firestore --project domo-rules-test \
+  "node --test test/rules/rules.test.mjs"
+```
+
+Requer a CLI `firebase` no `PATH`. Localmente, o `node` que
+`firebase emulators:exec` injeta na sua subshell é o binário `pkg` embutido do
+próprio firebase-tools, que não suporta a flag `--test` — se o comando acima
+falhar por causa disso, invoque um Node 20+ de verdade pelo caminho absoluto
+em vez de depender do `PATH` dentro da subshell (ver `docs/BACKEND.pt-br.md`,
+"Testes", e a seção de CI do `docs/DEPLOY.pt-br.md`, que contorna a mesma
+peculiaridade no CI usando o Node que o `actions/setup-node` coloca no
+`PATH`).
 
 ---
 

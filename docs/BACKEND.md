@@ -137,6 +137,82 @@ legal value for both:
   `.estoqueMinimo` / `.noCarrinho` — see "Optional item quantity control"
   below.
 
+## Integration surface: how the client reads/writes this backend
+
+Domo has **no Cloud Functions** — `firebase.json` has no `functions` block and
+there is no `functions/` directory anywhere in this repo. The entire
+client-backend surface is direct **Firestore SDK** (`cloud_firestore`) reads
+and writes, governed by the rules above, plus **Firebase Auth SDK** calls for
+identity. There is no REST or GraphQL API of Domo's own.
+
+### Firebase Auth (`firebase_auth` + `google_sign_in`)
+
+All in `AuthRepositoryImpl`
+(`lib/features/auth/data/repositories/auth_repository_impl.dart`) — standard
+Firebase Auth SDK calls, not governed by `firestore.rules`:
+
+| Method | Calls | Fails |
+|---|---|---|
+| `signInWithEmailAndPassword` | `FirebaseAuth.signInWithEmailAndPassword` | `FirebaseAuthException` (`wrong-password`, `user-not-found`, ...), propagated uncaught |
+| `createUserWithEmailAndPassword` | `FirebaseAuth.createUserWithEmailAndPassword` | `FirebaseAuthException` (`email-already-in-use`, `weak-password`, ...) |
+| `signInWithGoogle` | web: `signInWithPopup`; mobile: `google_sign_in` + `signInWithCredential`. Returns silently (no-op) if the user cancels the native picker | `FirebaseAuthException` / `PlatformException` |
+| `signOut` | `FirebaseAuth.signOut()` + `GoogleSignIn.signOut()` in parallel | rarely fails, not specially handled |
+| `authStateChanges` | `FirebaseAuth.authStateChanges()` stream, watched by `authStateProvider`, drives the router's redirect (`lib/core/router/app_router.dart`) | n/a (stream) |
+
+### Cloud Firestore (`cloud_firestore` SDK) — collection/document paths
+
+Every path below is reachable only through the rule matched in the table in
+"New security model" above — link there for **who can call it** instead of
+repeating it per row. Two repositories own every read/write in the app.
+
+**`CasaRepositoryImpl`**
+(`lib/features/casa/data/repositories/casa_repository_impl.dart`) —
+`casas/{id}` and `codigos/{CODE}`:
+
+| Method | Addressed as | In → out | Fails | Also changes |
+|---|---|---|---|---|
+| `watchCasaDoUsuario(userId)` | query `casas` where `membrosAtivos array-contains userId`, `.limit(1)`, realtime | `userId` → `Stream<CasaModel?>` | a well-formed query is never permission-denied — the rule structurally limits results to the caller's own houses; other stream errors surface via `AsyncValue`/`DomoErrorState` | read-only |
+| `criarCasa({nome, userId, nomeUsuario, fotoUrl})` | `casas.doc()` (new id) **create**, then `codigos.doc(codigo)` **create** — two sequential writes, deliberately **not** batched (the `codigos` create rule `get()`s the casa doc, which only sees already-committed state; a batch/transaction evaluates rules pre-commit and would always deny it) | args → `Future<CasaModel>` | if the `codigos` write throws, the method deletes the just-created `casas` doc and rethrows — never leaves an orphaned unjoinable house. Raw `FirebaseException`, no custom wrapper | creates 2 docs; fires `logCasaCriada()` (fire-and-forget) |
+| `entrarNaCasa({codigo, userId, nomeUsuario, fotoUrl})` | `get codigos/{codigo.toUpperCase()}` → `casaId`, then `casas/{casaId}` **update** (`membros.$userId`) | args → `Future<void>` | throws a plain `Exception('Código inválido...')` (not `FirebaseException`) if the code doesn't resolve — callers must catch generic `Exception`, not just Firebase errors | adds `membros.{userId}` as `pendente` — does **not** touch `membrosAtivos`, so the joiner's own `watchCasaDoUsuario` stream stays empty until an owner approves (see the join/approval trace in `docs/ARQUITETURA.md`); fires `logCasaEntrou()` |
+| `watchMembros(casaId)` | `casas/{casaId}` doc snapshots, realtime, maps the `membros` field | `casaId` → `Stream<List<MembroModel>>` | stream starts failing if the caller stops being a member mid-session | read-only |
+| `aprovarMembro({casaId, userId})` | `casas/{casaId}` **update**: `membros.$userId.status='ativo'` + `arrayUnion` into `membrosAtivos` | args → `Future<void>` | permission-denied if caller isn't the owner | flips the approved user's `watchCasaDoUsuario` query from empty to matching — this is what actually admits them into the house, live, on their own device |
+| `recusarMembro({casaId, userId})` | `casas/{casaId}` **update**: deletes `membros.$userId` | args → `Future<void>` | permission-denied if caller isn't the owner | none (was never in `membrosAtivos`) |
+| `atualizarCargo({casaId, userId, cargo})` | `casas/{casaId}` **update**: `membros.$userId.cargo` | args → `Future<void>` | permission-denied if caller isn't the owner | cosmetic only — `cargo` grants nothing in the rules (see "New security model") |
+| `removerMembroAtivo({casaId, userId})` | `casas/{casaId}` **update**: deletes `membros.$userId` + `arrayRemove` from `membrosAtivos` | args → `Future<void>` | permission-denied if caller isn't the owner | drops the user from every stream keyed on `membros`/`membrosAtivos` immediately; does not retroactively change `atualizadoPor` on items they last touched |
+| `deletarCasa({casaId})` | reads the casa doc for its `codigo`, then a **batch**: delete `codigos/{codigo}` + delete `casas/{casaId}` | `casaId` → `Future<void>` | batch is all-or-nothing; `FirebaseException` propagates if either half is denied | **the `itens` subcollection is not deleted** — Firestore doesn't cascade-delete subcollections, and this batch never touches `casas/{casaId}/itens/*`, so those docs become permanently unreachable orphans (no rule path can read them once the parent `casas/{casaId}` doc is gone). Not cleaned up anywhere in this codebase. TODO: confirmar whether this is an accepted trade-off at pilot scale or should get a cleanup step before onboarding more houses |
+| `atualizarOrdemCategorias({casaId, ordem})` | `casas/{casaId}` **update**: `ordemCategorias` only | args → `Future<void>` | permission-denied for a pendente/non-member; rule also rejects the write if any other key is touched (never happens from this method, which only ever sends this one field) | fires `logCasaOrdemCategoriasAlterada()` |
+
+**`DispensaRepositoryImpl`**
+(`lib/features/dispensa/data/repositories/dispensa_repository_impl.dart`) —
+`casas/{casaId}/itens/{itemId}` subcollection:
+
+| Method | Addressed as | In → out | Fails | Also changes |
+|---|---|---|---|---|
+| `watchItens(casaId)` | `itens` subcollection, `orderBy('nome')`, realtime | `casaId` → `Stream<List<PantryItem>>` | stream starts failing if the caller is removed from the house mid-session | read-only |
+| `adicionarItem({casaId, nome, categoria, userId})` | `itens.add()` (auto id) | args → `Future<void>` | permission-denied for pendente/non-members | new items are always created OFF-mode (`controlaEstoque` absent) — no way to create a pre-configured ON-mode item in one call |
+| `atualizarItem({casaId, itemId, nome, categoria})` | `itens/{itemId}` **update**: `nome`/`categoria` only | args → `Future<void>` | permission-denied if not an active member | deliberately does **not** rewrite `atualizadoPor`/`atualizadoEm` — see "Deferred advisories" above, not restated here |
+| `atualizarStatus({casaId, itemId, statusAnterior, novoStatus, userId})` | `itens/{itemId}` **update**: `status`/`atualizadoEm`/`atualizadoPor` | args → `Future<void>` | rejected by `itemOnModeConsistent()` if called against an ON-mode item with a `status` that disagrees with its own `quantidade`/`estoqueMinimo` — in practice the UI only wires this to OFF-mode items (`PantryItemCard`'s `_StatusToggleZone`, rendered only when `!item.controlaEstoque`); ON-mode items use `atualizarQuantidade`/`marcarNoCarrinho` instead | fires `logItemStatusAlterado()` |
+| `deletarItem({casaId, itemId})` | `itens/{itemId}` **delete** | args → `Future<void>` | permission-denied if not an active member | none beyond the doc itself |
+| `atualizarDispensaEmLote({casaId, itens, userId})` | **batch** of `itens/{id}` updates, one per item passed in | args → `Future<void>` | batch is all-or-nothing; any single item failing validation fails the whole "close cart" action | ON-mode items: bumps `quantidade` to `estoqueMinimo + 1` (not just flipping status) so the derived status recomputes to `tem`, and clears `noCarrinho`; OFF-mode items: sets `status: tem` directly. Fires `logCarrinhoFechado()` once for the whole batch |
+| `ativarControleEstoque({casaId, itemId, quantidade, estoqueMinimo, userId})` | `itens/{itemId}` **update**: turns ON-mode on, sets `quantidade`/`estoqueMinimo`, derives `status`, clears `noCarrinho` | args → `Future<void>` | permission-denied if not an active member; rejected if `quantidade`/`estoqueMinimo` are negative | switches the item from the manual 3-status model to the derived one |
+| `desativarControleEstoque({casaId, itemId, statusCongelado, userId})` | `itens/{itemId}` **update**: turns ON-mode off, freezes `status` at `statusCongelado`, clears `noCarrinho` | args → `Future<void>` | permission-denied if not an active member | `quantidade`/`estoqueMinimo` are retained on the doc, not deleted, in case the item is switched back to ON-mode later |
+| `atualizarQuantidade({casaId, itemId, quantidade, estoqueMinimo, userId})` | `itens/{itemId}` **update**: `quantidade`/`estoqueMinimo`/derived `status` | args → `Future<void>` | permission-denied if not an active member; rejected server-side if either value goes negative (also blocked client-side — see the end-to-end trace in `docs/ARQUITETURA.md`) | fires `logItemQuantidadeAtualizada()` — but only from this deliberate-edit path, never from the automatic bump in `atualizarDispensaEmLote` (see the doc comment on `logItemQuantidadeAtualizada` in `analytics_service.dart`) |
+| `marcarNoCarrinho({casaId, itemId, noCarrinho, userId})` | `itens/{itemId}` **update**: `noCarrinho` bool | args → `Future<void>` | permission-denied if not an active member | ON-mode's equivalent of the OFF-mode `no_carrinho` status value — see "New in this cycle: optional item quantity control" below |
+
+**Error surfacing, across both repositories:** every controller
+(`DispensaController`, `CasaController`) wraps writes in
+`AsyncValue.guard(...)`, so a thrown `FirebaseException`/`Exception` lands in
+that controller's Riverpod state as `AsyncError`. But only 4 screens actually
+`ref.listen` a controller to show that error to the user
+(`login_page.dart`, `register_page.dart`, `entrar_casa_page.dart`,
+`criar_casa_page.dart` — confirmed by grep across `lib/features`). Every other
+mutation call site (the pantry item stepper/status toggle, approve/remove
+member, category reorder, ...) only calls `.notifier` methods and never
+listens for the resulting error state, so a permission-denied write on those
+paths currently fails silently from the user's point of view — the value
+just doesn't change, with no visible error. TODO: confirmar whether that's an
+accepted trade-off or a gap worth closing.
+
 ## New in this cycle: optional item quantity control
 
 Per-item, opt-in stock control (`PantryItem.controlaEstoque`, default

@@ -164,7 +164,104 @@ Auth (Firebase Auth) e dados (Cloud Firestore) — modelo de dados, regras de
 segurança, e o fluxo de join-por-código são documentados em profundidade em
 `docs/BACKEND.pt-br.md`. Resumo de uma linha: `casas/{id}` com um mapa embutido
 `membros` (fonte da verdade de autorização) + `itens/{itemId}` como
-subcoleção, e uma coleção `codigos/{CODE}` como lookup seguro de convite.
+subcoleção, e uma coleção `codigos/{CODE}` como lookup seguro de convite. O
+detalhamento método a método de toda leitura/escrita que o cliente faz
+(argumentos, modos de falha, efeitos colaterais) está em
+`docs/BACKEND.pt-br.md`, "Superfície de integração".
+
+## Traces ponta a ponta: duas operações representativas
+
+Duas operações, escolhidas porque exercitam a stack de formas genuinamente
+diferentes: uma é uma escrita cujo efeito em tempo real é observado de volta
+no *mesmo* device que a fez; a outra é uma escrita em um device cujo efeito em
+tempo real é observado em um device *completamente diferente*, sem nenhuma
+ação do segundo usuário.
+
+### Trace 1 — escrita + atualização em tempo real no mesmo device: ajustar a quantidade de um item
+
+1. **UI**: o usuário toca em `+`/`-` no stepper de quantidade do item da
+   dispensa — `_QuantityZone.ajustar(delta)` em
+   `lib/features/dispensa/presentation/widgets/pantry_item_card.dart` (essa
+   zona só renderiza quando `item.controlaEstoque == true`; itens em modo OFF
+   renderizam `_StatusToggleZone` em vez disso — ver a nota de falha abaixo).
+2. **Controller**: `DispensaController.atualizarQuantidade(...)`
+   (`lib/features/dispensa/presentation/providers/dispensa_controller.dart`)
+   lê o uid logado a partir de `authStateProvider` e envolve a chamada em
+   `AsyncValue.guard(...)`.
+3. **Repositório**: `DispensaRepositoryImpl.atualizarQuantidade`
+   (`lib/features/dispensa/data/repositories/dispensa_repository_impl.dart`)
+   calcula o status derivado no lado do cliente via
+   `PantryItem.statusPorQuantidade(quantidade, estoqueMinimo)`, depois faz um
+   único `casas/{casaId}/itens/{itemId}.update({quantidade, estoqueMinimo,
+   status, atualizadoEm: serverTimestamp(), atualizadoPor: userId})`.
+4. **Backend**: `itemWriteValid()` → `itemOnModeConsistent()` do
+   `firestore.rules` (o `controlaEstoque: true` já existente no item sobrevive
+   ao merge, já que o update não toca nesse campo) re-deriva o mesmo status no
+   servidor e rejeita a escrita se o `status` do cliente discordar — o cliente
+   não consegue empurrar um valor derivado desatualizado ou errado.
+5. **Propagação em tempo real, mesmo device**: o stream `itensProvider(casaId)`
+   já aberto
+   (`lib/features/dispensa/presentation/providers/dispensa_provider.dart`,
+   apoiado em `DispensaRepositoryImpl.watchItens`) recebe o novo snapshot no
+   instante em que o Firestore commita — o Firestore empurra updates pra todo
+   listener aberto, incluindo o do próprio device que escreveu — e
+   `DispensaPage`
+   (`lib/features/dispensa/presentation/pages/dispensa_page.dart`) refaz o
+   build via `itensAsync.when(...)`, mostrando a nova quantidade/status sem
+   nenhum reload manual.
+6. **Caminho de falha**: uma `FirebaseException` (ex.: permission-denied, se o
+   chamador foi removido da casa no meio da sessão) é capturada pelo
+   `AsyncValue.guard` e cai no estado Riverpod do `DispensaController` como
+   `AsyncError` — mas `pantry_item_card.dart` só faz `ref.read` do notifier do
+   controller pra chamar o método, nunca faz `ref.listen` pro erro resultante,
+   então essa falha em específico hoje é silenciosa do ponto de vista do
+   usuário (o valor simplesmente não muda, sem erro exibido). Ver
+   `docs/BACKEND.pt-br.md`, "Superfície de integração", pra lista completa das
+   telas que de fato exibem erros de controller.
+
+### Trace 2 — leitura em tempo real cross-device: entrar numa casa por código e ser aprovado
+
+Dois usuários diferentes, em dois devices diferentes, um fluxo contínuo.
+Diferente do Trace 1 porque a escrita e a leitura em tempo real que reage a
+ela acontecem em devices diferentes — o segundo device atualiza puramente
+porque sua query ao vivo se reavalia, sem nenhuma ação daquele usuário.
+
+1. **B envia um código de convite**: `EntrarCasaPage`
+   (`lib/features/casa/presentation/pages/entrar_casa_page.dart`) chama
+   `CasaController.entrarNaCasa(codigo)`
+   (`lib/features/casa/presentation/providers/casa_controller.dart`) →
+   `CasaRepositoryImpl.entrarNaCasa`
+   (`lib/features/casa/data/repositories/casa_repository_impl.dart`): um
+   `get codigos/{CODE}` resolve o código pra um `casaId`, depois
+   `casas/{casaId}.update({'membros.$userId': {..., status: 'pendente'}})`.
+   Regras: `joinAsPending()` — B só pode adicionar a si mesmo, como
+   `pendente`.
+2. **Tela do próprio B**: o `ref.listen(casaControllerProvider, ...)` de
+   `EntrarCasaPage` mostra um snackbar de "pedido de entrada enviado" no
+   sucesso. O stream `casaDoUsuarioProvider` de B (`watchCasaDoUsuario`, uma
+   query em `membrosAtivos array-contains B.uid`) continua retornando nada — B
+   só foi adicionado a `membros`, não a `membrosAtivos` — então o redirect
+   central do router (`_RouterNotifier` em `lib/core/router/app_router.dart`)
+   mantém B em `CasaGatePage`, a mesma tela genérica de "ainda sem casa"
+   mostrada pra qualquer usuário sem casa nenhuma; não existe um estado de UI
+   distinto pra "aprovação pendente".
+3. **A (o owner) vê o membro pendente**: `CasaPage`
+   (`lib/features/casa/presentation/pages/casa_page.dart`) observa
+   `membrosProvider(casaId)` (`watchMembros`, um listener do doc
+   `casas/{casaId}`), que inclui a entrada de B independente do status, e
+   renderiza uma ação de aprovar para entradas pendentes.
+4. **A aprova**: toca a ação → `CasaController.aprovarMembro(casaId, B.uid)` →
+   `CasaRepositoryImpl.aprovarMembro`:
+   `casas/{casaId}.update({'membros.$B.status': 'ativo', 'membrosAtivos':
+   FieldValue.arrayUnion([B.uid])})`. Regras: `ownerManages()` — só o owner.
+5. **Propagação em tempo real, device de B**: o listener da query
+   `watchCasaDoUsuario` de B — aberto o tempo todo, esperando — se reavalia no
+   instante em que o Firestore commita a escrita de A, e agora casa com o doc
+   da casa (o uid de B acabou de entrar em `membrosAtivos`). O stream emite a
+   casa, `casaDoUsuarioProvider` atualiza, o redirect do router percebe que B
+   agora tem uma casa e roteia B automaticamente de `/casa/gate` pro shell
+   (`/dispensa`) — B nunca dá refresh nem reabre o app; a transição acontece
+   ao vivo, movida inteiramente pelo listener aberto.
 
 ## TODO: confirmar
 

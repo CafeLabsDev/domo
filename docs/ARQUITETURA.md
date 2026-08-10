@@ -166,7 +166,100 @@ Auth (Firebase Auth) and data (Cloud Firestore) — the data model, security
 rules, and the join-by-code flow are documented in depth in
 `docs/BACKEND.md`. One-line summary: `casas/{id}` with an embedded `membros`
 map (source of truth for authorization) + `itens/{itemId}` as a subcollection,
-and a `codigos/{CODE}` collection as a secure invite lookup.
+and a `codigos/{CODE}` collection as a secure invite lookup. Method-by-method
+detail of every read/write the client issues (arguments, failure modes, side
+effects) is in `docs/BACKEND.md`, "Integration surface".
+
+## End-to-end traces: two representative operations
+
+Two operations, chosen because they exercise the stack in genuinely different
+ways: one is a write whose realtime effect is observed back on the *same*
+device that made it; the other is a write on one device whose realtime effect
+is observed on a completely *different* device, with no action from the
+second user.
+
+### Trace 1 — write + same-device realtime update: adjusting an item's quantity
+
+1. **UI**: the user taps `+`/`-` on a pantry item's quantity stepper —
+   `_QuantityZone.ajustar(delta)` in
+   `lib/features/dispensa/presentation/widgets/pantry_item_card.dart` (this
+   zone only renders when `item.controlaEstoque == true`; OFF-mode items
+   render `_StatusToggleZone` instead — see the failure note below).
+2. **Controller**: `DispensaController.atualizarQuantidade(...)`
+   (`lib/features/dispensa/presentation/providers/dispensa_controller.dart`)
+   reads the signed-in uid off `authStateProvider` and wraps the call in
+   `AsyncValue.guard(...)`.
+3. **Repository**: `DispensaRepositoryImpl.atualizarQuantidade`
+   (`lib/features/dispensa/data/repositories/dispensa_repository_impl.dart`)
+   computes the derived status client-side via
+   `PantryItem.statusPorQuantidade(quantidade, estoqueMinimo)`, then issues one
+   `casas/{casaId}/itens/{itemId}.update({quantidade, estoqueMinimo, status,
+   atualizadoEm: serverTimestamp(), atualizadoPor: userId})`.
+4. **Backend**: `firestore.rules`' `itemWriteValid()` → `itemOnModeConsistent()`
+   (the item's existing `controlaEstoque: true` survives the merge, since the
+   update doesn't touch that field) re-derives the same status server-side and
+   rejects the write if the client's `status` disagrees — the client cannot
+   push a stale or wrong derived value.
+5. **Realtime propagation, same device**: the already-open
+   `itensProvider(casaId)` stream
+   (`lib/features/dispensa/presentation/providers/dispensa_provider.dart`,
+   backed by `DispensaRepositoryImpl.watchItens`) receives the new snapshot the
+   instant Firestore commits it — Firestore pushes updates to every open
+   listener, including the one on the writer's own device — and `DispensaPage`
+   (`lib/features/dispensa/presentation/pages/dispensa_page.dart`) rebuilds via
+   `itensAsync.when(...)`, showing the new quantity/status with no manual
+   reload.
+6. **Failure path**: a `FirebaseException` (e.g. permission-denied, if the
+   caller was removed from the house mid-session) is caught by
+   `AsyncValue.guard` and lands in `DispensaController`'s Riverpod state as
+   `AsyncError` — but `pantry_item_card.dart` only ever `ref.read`s the
+   controller's notifier to call the method, it never `ref.listen`s for the
+   resulting error, so this particular failure is currently silent from the
+   user's point of view (the value just doesn't change, no error shown). See
+   `docs/BACKEND.md`, "Integration surface", for the full list of screens that
+   do surface controller errors.
+
+### Trace 2 — cross-device realtime read: joining a house by code and being approved
+
+Two different users, on two different devices, one continuous flow. Different
+from Trace 1 because the write and the realtime read reacting to it happen on
+different devices — the second device updates purely because its live query
+re-evaluates, with no action from that user.
+
+1. **B submits a join code**: `EntrarCasaPage`
+   (`lib/features/casa/presentation/pages/entrar_casa_page.dart`) calls
+   `CasaController.entrarNaCasa(codigo)`
+   (`lib/features/casa/presentation/providers/casa_controller.dart`) →
+   `CasaRepositoryImpl.entrarNaCasa`
+   (`lib/features/casa/data/repositories/casa_repository_impl.dart`): a
+   `get codigos/{CODE}` resolves the code to a `casaId`, then
+   `casas/{casaId}.update({'membros.$userId': {..., status: 'pendente'}})`.
+   Rules: `joinAsPending()` — B may add only themselves, as `pendente`.
+2. **B's own screen**: `EntrarCasaPage`'s `ref.listen(casaControllerProvider,
+   ...)` shows a "join request sent" snackbar on success. B's
+   `casaDoUsuarioProvider` stream (`watchCasaDoUsuario`, a query on
+   `membrosAtivos array-contains B.uid`) still returns nothing — B was only
+   added to `membros`, not `membrosAtivos` — so the router's central redirect
+   (`_RouterNotifier` in `lib/core/router/app_router.dart`) keeps B on
+   `CasaGatePage`, the same generic "no house yet" screen shown to any user
+   with no house at all; there is no distinct "pending approval" UI state.
+3. **A (the owner) sees the pending member**: `CasaPage`
+   (`lib/features/casa/presentation/pages/casa_page.dart`) watches
+   `membrosProvider(casaId)` (`watchMembros`, a `casas/{casaId}` doc listener),
+   which includes B's entry regardless of status, and renders an approve
+   action for pending entries.
+4. **A approves**: taps the action → `CasaController.aprovarMembro(casaId,
+   B.uid)` → `CasaRepositoryImpl.aprovarMembro`:
+   `casas/{casaId}.update({'membros.$B.status': 'ativo', 'membrosAtivos':
+   FieldValue.arrayUnion([B.uid])})`. Rules: `ownerManages()` — owner only.
+5. **Realtime propagation, B's device**: B's `watchCasaDoUsuario` query
+   listener — open the whole time, waiting — re-evaluates the moment Firestore
+   commits A's write, and now matches the house doc (B's uid just entered
+   `membrosAtivos`). The stream emits the house, `casaDoUsuarioProvider`
+   updates, the router's redirect notices B now has a house and automatically
+   routes B off `/casa/gate` into the shell (`/dispensa`) — B never refreshes
+   or reopens the app; the transition happens live, driven entirely by the
+   open listener.
 
 ## TODO: confirmar
 
